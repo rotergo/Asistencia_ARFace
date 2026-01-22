@@ -1,0 +1,11 @@
+[
+    {
+        "id": 3,
+        "nombre": "prueba 3",
+        "ip": "192.168.1.35",
+        "puerto": "8080",
+        "area": "bodega",
+        "user": "admin",
+        "pass": "00000000."
+    }
+]

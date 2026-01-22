@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  scaf-app:
+    build: .
+    container_name: asistencia_arface
+    restart: unless-stopped  # Si se cae o reinicia el servidor, arranca solo
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mapeamos los archivos que deben sobrevivir a un reinicio
+      # Archivo local en servidor -> Archivo dentro del contenedor
+      - ./camaras.json:/app/camaras.json
+      - ./buffer_asistencia_v2.db:/app/buffer_asistencia_v2.db
+      # Opcional: Si quieres ver los logs de fotos desde fuera
+      - ./statics/fotos:/app/statics/fotos
+    environment:
+      - TZ=America/Santiago
+    networks:
+      - scaf_net
+
+networks:
+  scaf_net:
+    driver: bridge

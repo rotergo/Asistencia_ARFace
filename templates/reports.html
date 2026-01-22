@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes | ARF</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-custom mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand ms-3" href="#">
+                <i class="fas fa-fingerprint me-2"></i> ARF <span style="font-weight: 300; opacity: 0.8;">Admin</span>
+            </a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ms-auto me-4">
+                    <li class="nav-item"><a class="nav-link" href="/"><i class="fas fa-chart-line me-1"></i> Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/devices"><i class="fas fa-video me-1"></i> Dispositivos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/data"><i class="fas fa-database me-1"></i> Datos</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/reports"><i class="fas fa-file-alt me-1"></i> Reportes</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        
+        <div class="card shadow mb-4 border-0">
+            <div class="card-header py-3 bg-white">
+                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter me-2"></i> Generar Reporte de Asistencia</h6>
+            </div>
+            <div class="card-body bg-light">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Fecha Inicio</label>
+                        <input type="date" id="dateStart" class="form-control shadow-sm">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Fecha Fin</label>
+                        <input type="date" id="dateEnd" class="form-control shadow-sm">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Trabajador</label>
+                        <select id="selectWorker" class="form-select shadow-sm">
+                            <option value="all">👥 Todos los trabajadores</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex gap-2">
+                        <button class="btn btn-primary flex-grow-1 shadow-sm rounded-pill" onclick="buscarReporte()">
+                            <i class="fas fa-search me-2"></i> Buscar
+                        </button>
+                        <button class="btn btn-success shadow-sm rounded-pill px-3" onclick="exportarExcel()" title="Descargar Excel">
+                            <i class="fas fa-file-excel"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="tablaReporte">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4 py-3 text-secondary">FECHA</th>
+                                <th class="text-secondary">DÍA</th>
+                                <th class="text-secondary">TRABAJADOR</th>
+                                <th class="text-center text-primary bg-primary bg-opacity-10">ENTRADA AM</th>
+                                <th class="text-center text-secondary">SALIDA AM</th>
+                                <th class="text-center text-primary bg-primary bg-opacity-10">ENTRADA PM</th>
+                                <th class="text-center text-secondary">SALIDA PM</th>
+                                <th class="text-center text-secondary">ESTADO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTabla">
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <div class="py-4">
+                                        <i class="fas fa-search fa-3x mb-3 opacity-25"></i><br>
+                                        Selecciona un rango de fechas y presiona <strong>Buscar</strong>.
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white small text-muted text-end">
+                <span id="contadorResultados">0</span> registros encontrados
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 1. INICIALIZACIÓN
+        document.addEventListener('DOMContentLoaded', () => {
+            // Poner fechas por defecto (Hoy)
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('dateStart').value = hoy;
+            document.getElementById('dateEnd').value = hoy;
+            
+            cargarTrabajadores();
+        });
+
+        // 2. CARGAR COMBOBOX DE TRABAJADORES
+        function cargarTrabajadores() {
+            fetch('/api/workers/list')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('selectWorker');
+                    data.forEach(w => {
+                        const opt = document.createElement('option');
+                        opt.value = w.id;
+                        opt.text = w.nombre;
+                        select.appendChild(opt);
+                    });
+                });
+        }
+
+        // 3. BUSCAR DATOS
+        async function buscarReporte() {
+            const start = document.getElementById('dateStart').value;
+            const end = document.getElementById('dateEnd').value;
+            const worker = document.getElementById('selectWorker').value;
+            const tbody = document.getElementById('cuerpoTabla');
+
+            // Spinner de carga bonito
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <div class="mt-2 small text-muted">Consultando base de datos...</div>
+                    </td>
+                </tr>`;
+
+            try {
+                const res = await fetch('/api/reports/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ start, end, worker_id: worker })
+                });
+                
+                const data = await res.json();
+                tbody.innerHTML = '';
+                document.getElementById('contadorResultados').innerText = data.length;
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-folder-open me-2"></i>No se encontraron registros en este rango.</td></tr>';
+                    return;
+                }
+
+                data.forEach(row => {
+                    // Lógica visual para el Estado
+                    let badgeClass = 'bg-warning text-dark';
+                    let icon = '<i class="fas fa-exclamation-triangle me-1"></i>';
+                    
+                    if(row.estado === 'OK') {
+                        badgeClass = 'bg-success';
+                        icon = '<i class="fas fa-check me-1"></i>';
+                    } else if (row.estado === 'AUSENTE') {
+                        badgeClass = 'bg-danger';
+                        icon = '<i class="fas fa-times me-1"></i>';
+                    }
+
+                    // Formatear horas vacías
+                    const fmtHora = (h) => h === '-' ? '<span class="text-muted opacity-25">--:--</span>' : `<strong>${h}</strong>`;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-4 align-middle text-nowrap">${row.fecha}</td>
+                            <td class="align-middle text-muted small text-uppercase fw-bold">${row.dia}</td>
+                            <td class="align-middle fw-bold text-dark">${row.nombre}</td>
+                            
+                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmtHora(row.e_am)}</td>
+                            <td class="text-center align-middle font-monospace text-secondary">${fmtHora(row.s_am)}</td>
+                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmtHora(row.e_pm)}</td>
+                            <td class="text-center align-middle font-monospace text-secondary">${fmtHora(row.s_pm)}</td>
+                            
+                            <td class="text-center align-middle">
+                                <span class="badge ${badgeClass} rounded-pill px-3 shadow-sm">
+                                    ${icon}${row.estado || 'Pendiente'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4"><i class="fas fa-bug me-2"></i>Error cargando datos: ${error}</td></tr>`;
+            }
+        }
+
+        // 4. EXPORTAR A EXCEL PRO
+        function exportarExcel() {
+            const rows = document.querySelectorAll("#tablaReporte tr");
+            if(rows.length <= 2) { // Solo cabecera y mensaje vacío
+                Swal.fire('Sin datos', 'Primero realiza una búsqueda para exportar.', 'warning');
+                return;
+            }
+
+            let csv = [];
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+                // Evitar exportar filas vacías o de carga
+                if(cols.length < 8) continue; 
+
+                for (let j = 0; j < cols.length; j++) {
+                    let texto = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").trim();
+                    row.push('"' + texto + '"');
+                }
+                csv.push(row.join(";"));
+            }
+
+            const csvContent = "\uFEFF" + csv.join("\n");
+            const csvFile = new Blob([csvContent], {type: "text/csv;charset=utf-8"});
+            const downloadLink = document.createElement("a");
+            downloadLink.download = `Asistencia_SCAF_${document.getElementById('dateStart').value}.csv`;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+            Toast.fire({
+                icon: 'success',
+                title: 'Reporte descargado correctamente'
+            });
+        }
+    </script>
+</body>
+</html>

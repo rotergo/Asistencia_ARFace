@@ -1,0 +1,87 @@
+/* statics/css/style.css */
+
+/* 1. Importar Fuente Moderna */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+:root {
+    --primary-color: #4e73df; /* Azul corporativo */
+    --secondary-color: #858796;
+    --success-color: #1cc88a;
+    --dark-bg: #f8f9fc;
+    --card-shadow: 0 .15rem 1.75rem 0 rgba(58, 59, 69, .15);
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--dark-bg);
+    color: #5a5c69;
+}
+
+/* 2. Navbar con Gradiente */
+.navbar-custom {
+    background: linear-gradient(90deg, #4e73df 0%, #224abe 100%);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: white !important;
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.8) !important;
+    transition: all 0.3s;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: white !important;
+    font-weight: 600;
+    transform: translateY(-2px); /* Pequeña animación al pasar el mouse */
+}
+
+/* 3. Tarjetas con Efecto Flotante */
+.card {
+    border: none;
+    border-radius: 15px; /* Bordes redondeados */
+    box-shadow: var(--card-shadow);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px); /* La tarjeta "flota" al pasar el mouse */
+}
+
+.card-header {
+    background-color: white;
+    border-bottom: 1px solid #e3e6f0;
+    font-weight: 600;
+    color: #4e73df;
+    border-radius: 15px 15px 0 0 !important;
+}
+
+/* 4. Botones Modernos */
+.btn {
+    border-radius: 50px; /* Botones redondos */
+    padding: 10px 25px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border: none;
+    box-shadow: 0 4px 6px rgba(78, 115, 223, 0.4);
+}
+
+.btn-primary:hover {
+    background-color: #2e59d9;
+    box-shadow: 0 6px 8px rgba(78, 115, 223, 0.6);
+}
+
+/* 5. Tablas y Listas */
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 15px;
+}

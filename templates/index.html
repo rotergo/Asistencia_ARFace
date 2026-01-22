@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard ARF | Monitor</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-custom mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand ms-3" href="#">
+                <i class="fas fa-fingerprint me-2"></i> ARF <span style="font-weight: 300; opacity: 0.8;">Monitor</span>
+            </a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ms-auto me-4">
+                    <li class="nav-item"><a class="nav-link active" href="/"><i class="fas fa-chart-line me-1"></i> Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/devices"><i class="fas fa-video me-1"></i> Dispositivos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/data"><i class="fas fa-database me-1"></i> Datos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/reports"><i class="fas fa-file-alt me-1"></i> Reportes</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <div class="row mb-4">
+            
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-start border-success border-4 h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Presentes Hoy</div>
+                                <div class="h2 mb-0 font-weight-bold text-gray-800" id="txtPresentes">{{ presentes }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-user-check fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-start border-danger border-4 h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                    Ausentes / Pendientes</div>
+                                <div class="h2 mb-0 font-weight-bold text-gray-800" id="txtAusentes">{{ ausentes }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-user-clock fa-3x text-danger opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-start border-primary border-4 h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Plantilla Total</div>
+                                <div class="h2 mb-0 font-weight-bold text-gray-800">{{ total }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-users fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-start border-secondary border-4 h-100 py-2">
+                    <div class="card-body">
+                        <h6 class="text-xs font-weight-bold text-secondary text-uppercase mb-2">Estado del Servicio</h6>
+                        
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-circle text-muted me-2" style="font-size: 10px;" id="dotOracle"></i>
+                            <span class="small" id="statusOracle">Oracle: ...</span>
+                        </div>
+                        
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-circle text-muted me-2" style="font-size: 10px;" id="dotCam"></i>
+                            <span class="small" id="statusCam">Cámaras: ...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
+                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-satellite-dish me-2"></i> Monitor en Vivo</h6>
+                <div class="dropdown no-arrow">
+                    <select class="form-select form-select-sm shadow-none border-0 bg-light" id="filtroArea">
+                        <option value="todas">🏢 Todas las Áreas</option>
+                        {% for area in areas %}
+                        <option value="{{ area }}">{{ area }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4 py-3">HORA</th>
+                                <th>TRABAJADOR</th>
+                                <th>ESTADO</th>
+                                <th>UBICACIÓN</th>
+                                <th>DISPOSITIVO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaVivo">
+                            <tr><td colspan="5" class="text-center py-5 text-muted">Cargando monitor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            actualizarMonitor();
+            checkHealth();
+            
+            // Actualización automática
+            setInterval(actualizarMonitor, 2000); // Rápido para ver marcas al instante
+            setInterval(checkHealth, 10000);      // Lento para no saturar Oracle
+        });
+
+        // 1. MONITOR Y CONTADORES
+        function actualizarMonitor() {
+            const area = document.getElementById('filtroArea').value;
+            
+            fetch(`/api/dashboard/live?area=${area}`)
+                .then(r => r.json())
+                .then(data => {
+                    // Actualizar Números de las Tarjetas
+                    if(data.stats) {
+                        animarNumero('txtPresentes', data.stats.presentes);
+                        animarNumero('txtAusentes', data.stats.ausentes);
+                    }
+
+                    // Actualizar Tabla
+                    const tbody = document.getElementById('tablaVivo');
+                    tbody.innerHTML = '';
+                    
+                    if (data.registros.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted"><i class="fas fa-coffee fa-2x mb-3 d-block opacity-50"></i>Esperando marcajes recientes...</td></tr>';
+                    } else {
+                        data.registros.forEach(reg => {
+                            // Estilo de badge según estado
+                            let badgeClass = 'bg-primary';
+                            if(reg.estado === 'Entrada') badgeClass = 'bg-success';
+                            if(reg.estado === 'Salida') badgeClass = 'bg-warning text-dark';
+                            
+                            tbody.innerHTML += `
+                                <tr style="animation: fadeIn 0.5s">
+                                    <td class="ps-4 fw-bold font-monospace text-secondary">${reg.hora}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle bg-primary text-white me-2 rounded-circle d-flex align-items-center justify-content-center" style="width:35px; height:35px; font-weight:bold;">
+                                                ${reg.nombre.charAt(0)}
+                                            </div>
+                                            <span class="fw-bold text-dark">${reg.nombre}</span>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 rounded-pill">${reg.estado || 'Marcaje'}</span></td>                                    <td>${reg.area}</td>
+                                    <td class="text-muted small"><i class="fas fa-camera me-1"></i> ${reg.dispositivo}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                })
+                .catch(e => console.error(e));
+        }
+
+        // 2. ESTADO DEL SISTEMA (LUCES)
+        function checkHealth() {
+            fetch('/api/status/health?t=' + Date.now())
+                .then(r => r.json())
+                .then(data => {
+                    // Oracle
+                    const dotOra = document.getElementById('dotOracle');
+                    const txtOra = document.getElementById('statusOracle');
+                    if(data.oracle) {
+                        dotOra.className = "fas fa-circle text-success me-2";
+                        txtOra.innerHTML = "Oracle: <strong>Conectado</strong>";
+                    } else {
+                        dotOra.className = "fas fa-circle text-danger me-2";
+                        txtOra.innerHTML = "Oracle: <span class='text-danger'>Desconectado</span>";
+                    }
+
+                    // Cámaras
+                    const dotCam = document.getElementById('dotCam');
+                    const txtCam = document.getElementById('statusCam');
+                    if(data.cameras) {
+                        dotCam.className = "fas fa-circle text-success me-2";
+                        txtCam.innerHTML = `Cámaras: <strong>${data.active_count}/${data.total_cams} Online</strong>`;
+                    } else {
+                        dotCam.className = "fas fa-circle text-danger me-2";
+                        txtCam.innerHTML = "Cámaras: <span class='text-danger'>Sin señal</span>";
+                    }
+                });
+        }
+
+        // Efecto visual simple al cambiar números
+        function animarNumero(id, nuevoValor) {
+            const el = document.getElementById(id);
+            if(el.innerText != nuevoValor) {
+                el.innerText = nuevoValor;
+                el.style.color = "#4e73df"; // Flash azul
+                setTimeout(() => el.style.color = "", 300);
+            }
+        }
+    </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body>
+</html>
