@@ -33,20 +33,6 @@ def motor_asistencia_background():
         try:
             # 1. SINCRONIZACIÓN ORACLE
             turnos.sincronizar_con_oracle()
-
-            # 2. LECTURA DE CÁMARAS
-            for cam in camaras.LISTA_CAMARAS:
-                if not cam.get('ip'): continue
-
-                # (Aquí NO debe haber ninguna llamada a sincronizar_reloj_camara)
-
-                # Descargar logs
-                registros = camaras.descargar_logs_asistencia(cam)
-                if registros:
-                    nuevos = turnos.procesar_lecturas_camara(registros, cam)
-                    if nuevos > 0:
-                        print(f"📷 [Cámara {cam.get('nombre')}] {nuevos} marcas nuevas.")
-            
         except Exception as e:
             print(f"⚠️ [Motor Error] {e}")
         
