@@ -2,7 +2,8 @@ from configuracion.base_datos import obtener_conexion_oracle
 import modulos.offline as offline
 from datetime import datetime, timedelta
 import modulos.correos as correos
-from modulos.seguridad import generar_hash_asistencia
+# --- CORRECCIÓN: Importamos la NUEVA función de hash completo ---
+from modulos.seguridad import generar_hash_fila
 
 # --- CACHÉS ---
 CACHE_PROCESADOS_RAM = set()
@@ -79,8 +80,7 @@ def parsear_fecha_oracle(fecha_str):
 
 def sincronizar_con_oracle():
     """ 
-    FASE 2: LÓGICA RESOLUCIÓN 38 (CORRECCIÓN ORA-01400)
-    Se inserta explícitamente el ID usando la secuencia.
+    FASE 2: LÓGICA INTELIGENTE + SEGURIDAD BANCARIA
     """
     pendientes = offline.obtener_pendientes()
     if not pendientes: return
@@ -112,22 +112,24 @@ def sincronizar_con_oracle():
             fecha_dia_str = marca_dt.strftime('%Y-%m-%d')
             hora_str = marca_dt.strftime('%H:%M:%S')
 
-            # Buscar Turno
+            # Búsqueda de turno (Lógica corregida de rango)
             sql_turno = """
                 SELECT 
                     TURNO_INICIO_DESDE, TURNO_INICIO_HASTA,
                     TURNO_FINAL_DESDE, TURNO_FINAL_HASTA,
                     NOMBRE
                 FROM ERPG_VTURNOS_PROGRAMADOS
-                WHERE RUT = :1 AND FECHA_INICIO_TURNO = TO_DATE(:2, 'YYYY-MM-DD')
+                WHERE RUT = :1 
+                  AND TRUNC(FECHA_INICIO_TURNO) <= TO_DATE(:2, 'YYYY-MM-DD')
+                  AND TRUNC(FECHA_TERMINO_TURNO) >= TO_DATE(:3, 'YYYY-MM-DD')
             """
             
             turno = None
             try:
-                cursor.execute(sql_turno, [rut_buscar, fecha_dia_str])
+                cursor.execute(sql_turno, [rut_buscar, fecha_dia_str, fecha_dia_str])
                 turno = cursor.fetchone()
                 if not turno:
-                    cursor.execute(sql_turno, [rut_insertar, fecha_dia_str])
+                    cursor.execute(sql_turno, [rut_insertar, fecha_dia_str, fecha_dia_str])
                     turno = cursor.fetchone()
             except Exception as e:
                 print(f"⚠️ Error SQL Turno: {e}")
@@ -139,21 +141,19 @@ def sincronizar_con_oracle():
             texto_detalle = ""
             estado_global = "PENDIENTE"
             
-            # --- MOTOR DE DECISIÓN ---
+            # --- MOTOR DE DECISIÓN (Lógica de Atrasos) ---
             if turno:
                 t_entrada_am = parsear_fecha_oracle(turno[0])
                 t_salida_am  = parsear_fecha_oracle(turno[1])
                 t_entrada_pm = parsear_fecha_oracle(turno[2])
                 t_salida_pm  = parsear_fecha_oracle(turno[3])
 
-                # DÍA LIBRE
                 es_dia_libre = False
                 if t_entrada_am and t_entrada_am.hour == 0 and t_entrada_am.minute == 0:
                      if t_salida_pm and t_salida_pm.hour == 0 and t_salida_pm.minute == 0:
                          es_dia_libre = True
 
                 if es_dia_libre:
-                    print(f"⚠️ {nombre_real}: DÍA LIBRE TRABAJADO.")
                     h = marca_dt.hour
                     columna_destino = "ENTRADA_AM" if h < 12 else "ENTRADA_PM"
                     texto_detalle = "DIA LIBRE TRAB"
@@ -176,25 +176,18 @@ def sincronizar_con_oracle():
 
                         if diff_segundos < 14400: # 4 horas max diff
                             columna_destino = tipo_marca
-                            
                             delta_real = (marca_dt - horario_programado).total_seconds() / 60 
                             TOLERANCIA = 5 
 
                             if "ENTRADA" in tipo_marca:
-                                if delta_real > TOLERANCIA:
-                                    texto_detalle = f"ATRASO {int(delta_real)}m"
-                                elif delta_real < -TOLERANCIA: 
-                                    texto_detalle = f"ADELANTO {int(abs(delta_real))}m"
-                                else:
-                                    texto_detalle = "A TIEMPO" 
+                                if delta_real > TOLERANCIA: texto_detalle = f"ATRASO {int(delta_real)}m"
+                                elif delta_real < -TOLERANCIA: texto_detalle = f"ADELANTO {int(abs(delta_real))}m"
+                                else: texto_detalle = "A TIEMPO" 
                             
                             elif "SALIDA" in tipo_marca:
-                                if delta_real > 0:
-                                    texto_detalle = f"EXTRA {int(delta_real)}m"
-                                elif delta_real < -TOLERANCIA:
-                                    texto_detalle = f"ANTICIPADA {int(abs(delta_real))}m"
-                                else:
-                                    texto_detalle = "A TIEMPO"
+                                if delta_real > 0: texto_detalle = f"EXTRA {int(delta_real)}m"
+                                elif delta_real < -TOLERANCIA: texto_detalle = f"ANTICIPADA {int(abs(delta_real))}m"
+                                else: texto_detalle = "A TIEMPO"
 
             # FALLBACK
             if not columna_destino:
@@ -202,25 +195,82 @@ def sincronizar_con_oracle():
                 if h < 12: columna_destino = "ENTRADA_AM"
                 elif 12 <= h < 15: columna_destino = "SALIDA_AM" if marca_dt.minute < 30 else "ENTRADA_PM"
                 else: columna_destino = "SALIDA_PM"
-                
                 texto_detalle = "FUERA HORARIO" if turno else "SIN TURNO"
                 estado_global = "INCIDENCIA"
 
             columna_detalle = MAPA_COLUMNAS_DETALLE.get(columna_destino, "ESTADO")
-            
             if columna_destino == "SALIDA_PM" and estado_global != "INCIDENCIA":
                 estado_global = "CERRADO"
 
-            # --- 4. GUARDADO (CON CORRECCIÓN DE ID) ---
+            # --- 4. GUARDADO BLINDADO CON HASH COMPLETO ---
             if columna_destino:
-                sql_check = f"SELECT COUNT(*) FROM ERPG_PASO_CAMARA WHERE ID_TRABAJADOR=:1 AND FECHA_DIA=TO_DATE(:2,'YYYY-MM-DD') AND {columna_destino} IS NOT NULL"
-                cursor.execute(sql_check, [rut_insertar, fecha_dia_str])
+                # Recuperamos fila existente para mezclar datos
+                sql_check_full = """
+                    SELECT ID_SECUENCIA, ENTRADA_AM, SALIDA_AM, ENTRADA_PM, SALIDA_PM, ESTADO, AREA 
+                    FROM ERPG_PASO_CAMARA 
+                    WHERE ID_TRABAJADOR=:1 AND FECHA_DIA=TO_DATE(:2, 'YYYY-MM-DD')
+                """
+                cursor.execute(sql_check_full, [rut_insertar, fecha_dia_str])
+                fila_existente = cursor.fetchone()
+
+                v_e_am, v_s_am, v_e_pm, v_s_pm = None, None, None, None
+                v_estado = estado_global
+                v_area = area_evento
                 
-                if cursor.fetchone()[0] == 0:
-                    firma_sha256 = generar_hash_asistencia(rut_insertar, fecha_dia_str, hora_str, columna_destino, area_evento)
+                accion_realizada = False
+
+                if fila_existente:
+                    # UPDATE
+                    id_secuencia = fila_existente[0]
+                    v_e_am = fila_existente[1]
+                    v_s_am = fila_existente[2]
+                    v_e_pm = fila_existente[3]
+                    v_s_pm = fila_existente[4]
                     
-                    # ¡AQUÍ ESTÁ LA SOLUCIÓN AL ERROR ORA-01400!
-                    # Agregamos ID_SECUENCIA y usamos SEQ_ERPG_PASO_CAMARA.NEXTVAL
+                    # Verificamos si ya había dato para no sobrescribir sin querer
+                    # (Lógica simple: si ya hay hora, no la pisamos, o sí, según tu regla)
+                    # Aquí asumimos que si llega un dato nuevo, lo intentamos poner si está vacío
+                    ya_tiene_dato = False
+                    if columna_destino == "ENTRADA_AM" and v_e_am: ya_tiene_dato = True
+                    if columna_destino == "SALIDA_AM" and v_s_am: ya_tiene_dato = True
+                    if columna_destino == "ENTRADA_PM" and v_e_pm: ya_tiene_dato = True
+                    if columna_destino == "SALIDA_PM" and v_s_pm: ya_tiene_dato = True
+                    
+                    if not ya_tiene_dato:
+                        if columna_destino == "ENTRADA_AM": v_e_am = hora_str
+                        elif columna_destino == "SALIDA_AM": v_s_am = hora_str
+                        elif columna_destino == "ENTRADA_PM": v_e_pm = hora_str
+                        elif columna_destino == "SALIDA_PM": v_s_pm = hora_str
+
+                        # Generamos Hash con la fila COMPLETA
+                        nuevo_hash = generar_hash_fila(rut_insertar, nombre_real, fecha_dia_str, 
+                                                    v_e_am, v_s_am, v_e_pm, v_s_pm, 
+                                                    v_estado, v_area)
+
+                        sql_update = f"""
+                            UPDATE ERPG_PASO_CAMARA 
+                            SET {columna_destino} = :1, 
+                                {columna_detalle} = :2, 
+                                HASH_SHA256 = :3,
+                                ESTADO = :4,
+                                AREA = :5
+                            WHERE ID_SECUENCIA = :6
+                        """
+                        cursor.execute(sql_update, [hora_str, texto_detalle, nuevo_hash, v_estado, v_area, id_secuencia])
+                        print(f"🔄 [Oracle] UPDATE Blindado {nombre_real}: {columna_destino}")
+                        accion_realizada = True
+                
+                else:
+                    # INSERT
+                    if columna_destino == "ENTRADA_AM": v_e_am = hora_str
+                    elif columna_destino == "SALIDA_AM": v_s_am = hora_str
+                    elif columna_destino == "ENTRADA_PM": v_e_pm = hora_str
+                    elif columna_destino == "SALIDA_PM": v_s_pm = hora_str
+                    
+                    nuevo_hash = generar_hash_fila(rut_insertar, nombre_real, fecha_dia_str, 
+                                                v_e_am, v_s_am, v_e_pm, v_s_pm, 
+                                                v_estado, v_area)
+
                     sql_ins = f"""
                         INSERT INTO ERPG_PASO_CAMARA 
                         (ID_SECUENCIA, ID_TRABAJADOR, NOMBRE_TRABAJADOR, FECHA_DIA, DIA_SEMANA, ESTADO, AREA, 
@@ -229,18 +279,12 @@ def sincronizar_con_oracle():
                                 TRIM(TO_CHAR(TO_DATE(:4, 'YYYY-MM-DD'), 'Day', 'NLS_DATE_LANGUAGE=SPANISH')), 
                                 :5, :6, :7, :8, :9)
                     """
-                    cursor.execute(sql_ins, [
-                        rut_insertar,   # :1
-                        nombre_real,    # :2
-                        fecha_dia_str,  # :3
-                        fecha_dia_str,  # :4
-                        estado_global,  # :5
-                        area_evento,    # :6
-                        hora_str,       # :7
-                        texto_detalle,  # :8
-                        firma_sha256    # :9
-                    ])
-                    
+                    cursor.execute(sql_ins, [rut_insertar, nombre_real, fecha_dia_str, fecha_dia_str, v_estado, v_area, hora_str, texto_detalle, nuevo_hash])
+                    print(f"✨ [Oracle] INSERT Blindado {nombre_real}: {columna_destino}")
+                    accion_realizada = True
+
+                if accion_realizada:
+                    procesados += 1
                     try:
                         sql_email = "SELECT EMAIL_TRABAJADOR FROM ERPG_VTURNOS_PROGRAMADOS WHERE RUT = :1"
                         cursor.execute(sql_email, [rut_buscar])
@@ -248,16 +292,11 @@ def sincronizar_con_oracle():
                         if res and res[0]: 
                             correos.enviar_comprobante(nombre_real, res[0], fecha_dia_str, hora_str, f"{columna_destino}: {texto_detalle}", area_evento)
                     except: pass
-                    
-                    print(f"✅ [Oracle] {nombre_real}: {columna_destino} ({texto_detalle})")
-                    procesados += 1
-                else:
-                    print(f"🛡️ [Oracle] Omitido: Ya existe {columna_destino}")
             
             offline.eliminar_registro(item['id'])
 
         conn.commit()
-        if procesados > 0: print(f"🚀 [Oracle] {procesados} registros detallados guardados.")
+        if procesados > 0: print(f"🚀 [Oracle] {procesados} cambios sincronizados.")
 
     except Exception as e:
         print(f"❌ Error Sincronización: {e}")

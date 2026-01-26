@@ -6,6 +6,7 @@ import base64
 from datetime import datetime
 from configuracion.config import ARCHIVO_CAMARAS  
 from modulos.reloj_shoa import obtener_hora_oficial
+import modulos.biometria as biometria
 
 # --- UTILIDADES INTERNAS ---
 def _crear_sesion():
@@ -81,8 +82,8 @@ def descargar_logs_asistencia(cam_config):
 
 def enviar_usuario_a_camara(cam_config, uid, nombre):
     """
-    Sube un usuario y su foto JPG a la cámara.
-    Maneja la lógica de 'Borrar y Recrear' si ya existe.
+    Sube un usuario a la cámara desencriptando su foto en vuelo.
+    Cumple normativa de Privacidad (No storage of plain images).
     """
     session = _crear_sesion()
     headers = {'Content-Type': 'application/json'}
@@ -91,46 +92,51 @@ def enviar_usuario_a_camara(cam_config, uid, nombre):
     if not login_camara(cam_config['ip'], cam_config['puerto'], cam_config['user'], cam_config['pass']):
         return "Error: Auth Fallida"
 
-    # Preparar datos (Limpieza de RUT para la cámara)
+    # Limpieza de RUT
     uid_clean = str(uid).replace(".", "").replace("-", "").strip()
     nombre_safe = str(nombre)[:24]
 
-    # --- CORRECCIÓN DE RUTAS: Usar ruta absoluta basada en el archivo ---
+    # --- BÚSQUEDA DE BIOMETRÍA SEGURA ---
     lista_imagenes = []
     
-    # 1. Obtenemos la ruta exacta donde está ESTE archivo (camaras.py)
     directorio_actual = os.path.dirname(os.path.abspath(__file__))
-    # 2. Subimos un nivel para llegar a la raíz (Asistencia_ARFace)
     directorio_raiz = os.path.dirname(directorio_actual)
-    # 3. Construimos la ruta a las fotos
     ruta_fotos_dir = os.path.join(directorio_raiz, "statics", "fotos")
 
-    # Intentamos construir el RUT con guion
     rut_con_guion = uid_clean
     if len(uid_clean) > 1:
         rut_con_guion = f"{uid_clean[:-1]}-{uid_clean[-1]}"
 
-    rutas_posibles = [
-        os.path.join(ruta_fotos_dir, f"{uid}.jpg"),       # ID tal cual
-        os.path.join(ruta_fotos_dir, f"{uid_clean}.jpg"), # Sin puntos ni guion
-        os.path.join(ruta_fotos_dir, f"{rut_con_guion}.jpg") # Con guion
-    ]
+    # Prioridad: Archivos Encriptados (.bio)
+    nombres_posibles = [uid, uid_clean, rut_con_guion]
     
-    # Imprimimos la ruta COMPLETA para depurar (esto te dirá exactamente dónde busca)
-    print(f"🔍 Buscando en ruta absoluta: {rutas_posibles[-1]}")
+    bytes_imagen = None
+    archivo_encontrado = ""
 
-    for ruta in rutas_posibles:
-        if os.path.exists(ruta):
+    for n in nombres_posibles:
+        ruta_bio = os.path.join(ruta_fotos_dir, f"{n}.bio")
+        ruta_jpg = os.path.join(ruta_fotos_dir, f"{n}.jpg") # Soporte legado
+        
+        if os.path.exists(ruta_bio):
+            print(f"🔒 [Privacidad] Usando biometría encriptada: {n}.bio")
+            bytes_imagen = biometria.desencriptar_en_memoria(ruta_bio)
+            archivo_encontrado = ruta_bio
+            break
+        elif os.path.exists(ruta_jpg):
+            print(f"⚠️ [Aviso] Usando imagen NO encriptada: {n}.jpg (Se recomienda migrar)")
             try:
-                with open(ruta, "rb") as img_file:
-                    b64 = base64.b64encode(img_file.read()).decode('utf-8')
-                    lista_imagenes.append({"pose": "normal", "format": ".jpg", "data": f"data:image/jpeg;base64,{b64}"})
-                print(f"✅ Foto encontrada: {ruta}")
+                with open(ruta_jpg, "rb") as f: bytes_imagen = f.read()
+                archivo_encontrado = ruta_jpg
                 break
             except: pass
-    
-    if not lista_imagenes:
-        print(f"⚠️ No se encontró foto para {nombre}")
+
+    if bytes_imagen:
+        b64 = base64.b64encode(bytes_imagen).decode('utf-8')
+        lista_imagenes.append({"pose": "normal", "format": ".jpg", "data": f"data:image/jpeg;base64,{b64}"})
+        # Limpiamos RAM
+        del bytes_imagen 
+    else:
+        print(f"⚠️ No se encontró biometría para {nombre}")
 
     payload = {
         "name": nombre_safe,
@@ -139,24 +145,20 @@ def enviar_usuario_a_camara(cam_config, uid, nombre):
         "images": lista_imagenes
     }
     
-    # Intento 1: Agregar
+    # ... (El resto de la función sigue igual: Intento 1 Agregar, Intento 2 Actualizar) ...
     try:
         r = session.post(url_dispatch, json={"cmd": "ar_cmd_add_person", "payload": json.dumps(payload)}, headers=headers, timeout=10)
         resp = r.json()
         if resp.get('status') == 0: return "OK: Subido"
         
-        # Intento 2: Si existe, borrar y recrear
         if "duplicate" in str(resp).lower() or "exist" in str(resp).lower():
-            # Borrar
             session.post(url_dispatch, json={"cmd": "ar_cmd_remove_person", "payload": json.dumps({"personId": uid_clean})}, headers=headers)
-            # Recrear
             r2 = session.post(url_dispatch, json={"cmd": "ar_cmd_add_person", "payload": json.dumps(payload)}, headers=headers)
             if r2.json().get('status') == 0: return "OK: Actualizado"
             
         return f"Error: {resp.get('detail')}"
     except Exception as e:
         return f"Error Red: {e}"
-    
 
 # --- GESTIÓN DE ESTADO (LISTA DE CÁMARAS) ---
 LISTA_CAMARAS = []

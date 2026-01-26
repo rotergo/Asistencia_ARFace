@@ -147,13 +147,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <script>
+<script>
         document.addEventListener('DOMContentLoaded', () => {
             loadWorkers();
             loadCameras();
         });
 
-        // 1. CARGAR TRABAJADORES (Estilo Tarjeta)
+        // 1. CARGAR TRABAJADORES
         async function loadWorkers() {
             try {
                 const res = await fetch('/api/workers/list');
@@ -165,8 +165,9 @@
 
                 workers.forEach(w => {
                     const item = document.createElement('label');
-                    item.className = 'list-group-item list-group-item-action d-flex align-items-center p-3';
-                    // Usamos label para que al hacer clic en cualquier parte se marque el check
+                    // Importante: Añadimos 'worker-item' para identificar la tarjeta en la búsqueda
+                    item.className = 'list-group-item list-group-item-action d-flex align-items-center p-3 worker-item';
+                    item.style.cursor = 'pointer';
                     item.innerHTML = `
                         <input class="form-check-input me-3 worker-check" type="checkbox" value="${w.id}" data-name="${w.nombre}" style="transform: scale(1.2);">
                         <div>
@@ -177,11 +178,11 @@
                     container.appendChild(item);
                 });
             } catch (e) {
-                log("❌ Error crítico cargando trabajadores: " + e, 'error');
+                log("❌ Error cargando trabajadores: " + e, 'error');
             }
         }
 
-        // 2. CARGAR CÁMARAS (Estilo Tarjeta)
+        // 2. CARGAR CÁMARAS
         async function loadCameras() {
             try {
                 const res = await fetch('/api/devices/list_simple');
@@ -192,6 +193,7 @@
                 cameras.forEach(c => {
                     const item = document.createElement('label');
                     item.className = 'list-group-item list-group-item-action d-flex align-items-center p-3';
+                    item.style.cursor = 'pointer';
                     item.innerHTML = `
                         <input class="form-check-input me-3 camera-check" type="checkbox" value="${c.id}" style="transform: scale(1.2);">
                         <div class="w-100">
@@ -209,18 +211,63 @@
             }
         }
 
-        // --- LÓGICA DE SINCRONIZACIÓN ---
+        // --- BÚSQUEDA INTELIGENTE (Solución Error 1) ---
+        document.getElementById('searchWorker').addEventListener('keyup', function() {
+            // Función para normalizar texto (quita tildes y pasa a minúsculas)
+            const normalize = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            const term = normalize(this.value); 
+            const termClean = term.replace(/[^a-z0-9k]/g, ""); // Término limpio para RUT (sin puntos/guiones)
+
+            document.querySelectorAll('.worker-item').forEach(item => {
+                // Obtenemos todo el texto visible de la tarjeta
+                const textOriginal = normalize(item.innerText);
+                const textClean = textOriginal.replace(/[^a-z0-9k]/g, ""); // Limpiamos el texto de la tarjeta también
+
+                // Coincidencia: Por nombre (texto normal) O por RUT (texto limpio)
+                // Esto permite encontrar "12345678" aunque en pantalla diga "12.345.678-9"
+                const match = textOriginal.includes(term) || (termClean.length > 0 && textClean.includes(termClean));
+
+                if (match) {
+                    item.classList.remove('d-none');
+                    item.classList.add('d-flex'); // Forzamos display flex para mantener diseño
+                } else {
+                    item.classList.remove('d-flex');
+                    item.classList.add('d-none'); // Ocultamos con clase Bootstrap
+                }
+            });
+        });
+
+        // --- SELECCIONAR TODOS: TRABAJADORES (Solución Error 2) ---
+        document.getElementById('checkAllWorkers').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.worker-check').forEach(cb => {
+                const parent = cb.closest('.list-group-item');
+                // Solo marcamos si el elemento NO tiene la clase d-none (es decir, es visible)
+                if (parent && !parent.classList.contains('d-none')) {
+                    cb.checked = isChecked;
+                }
+            });
+        });
+        
+        // --- SELECCIONAR TODOS: CÁMARAS (Solución Error 3) ---
+        document.getElementById('checkAllCameras').addEventListener('change', function() {
+            const isChecked = this.checked;
+            // Aquí seleccionamos directamente todos porque no hay filtro de búsqueda para cámaras
+            document.querySelectorAll('.camera-check').forEach(cb => {
+                cb.checked = isChecked;
+            });
+        });
+
+        // --- LOGICA DE SINCRONIZACIÓN ---
         document.getElementById('btnSync').addEventListener('click', async () => {
             const btn = document.getElementById('btnSync');
-            
-            // Animación de carga en el botón
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
             
             log("🚀 Iniciando proceso de sincronización...", 'info');
 
-            // Recolectar datos
             const selectedUsers = [];
             document.querySelectorAll('.worker-check:checked').forEach(cb => {
                 selectedUsers.push({ id: cb.value, name: cb.getAttribute('data-name') });
@@ -231,7 +278,6 @@
                 selectedCameras.push(cb.value);
             });
 
-            // Validaciones
             if (selectedUsers.length === 0 || selectedCameras.length === 0) {
                 Swal.fire({
                     icon: 'warning',
@@ -240,7 +286,8 @@
                     confirmButtonColor: '#4e73df'
                 });
                 log("⚠️ Operación cancelada: Faltan selecciones.", 'error');
-                resetBtn(btn, originalContent);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
                 return;
             }
 
@@ -254,7 +301,6 @@
                 const result = await response.json();
                 
                 if (result.status === 'ok') {
-                    // Logs detallados en la consola visual
                     result.logs.forEach(l => {
                         if(l.includes('✅')) log(l, 'success');
                         else log(l, 'error');
@@ -266,8 +312,7 @@
                         icon: 'success',
                         confirmButtonColor: '#1cc88a'
                     });
-                    
-                    log(`🏁 Proceso finalizado. Total usuarios: ${selectedUsers.length}`, 'info');
+                    log(`🏁 Proceso finalizado.`, 'info');
                 } else {
                     Swal.fire('Error', 'Hubo un problema en el servidor.', 'error');
                     log("❌ Error del servidor: " + JSON.stringify(result), 'error');
@@ -278,60 +323,28 @@
                 log("❌ Error de red crítico: " + error, 'error');
             }
             
-            resetBtn(btn, originalContent);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
         });
 
-        function resetBtn(btn, html) {
-            btn.disabled = false;
-            btn.innerHTML = html;
-        }
-
-        // Utilidad: Agregar logs a la consola visual con colores
         function log(msg, type = 'info') {
             const consoleBox = document.getElementById('consoleLog');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             
-            // Iconos y colores según tipo
             if (type === 'error' || msg.includes('❌') || msg.includes('⚠️')) {
                 entry.className += ' log-error';
-                if(!msg.includes('❌')) msg = '⚠️ ' + msg;
             } else if (type === 'success' || msg.includes('✅')) {
                 entry.className += ' log-success';
             } else {
                 entry.className += ' log-info';
             }
 
-            // Timestamp
             const time = new Date().toLocaleTimeString();
             entry.innerText = `[${time}] ${msg}`;
-            
             consoleBox.appendChild(entry);
             consoleBox.scrollTop = consoleBox.scrollHeight;
         }
-
-        // Filtro de Búsqueda
-        document.getElementById('searchWorker').addEventListener('keyup', function() {
-            const val = this.value.toLowerCase();
-            document.querySelectorAll('#workersList .list-group-item').forEach(item => {
-                const text = item.innerText.toLowerCase();
-                item.style.display = text.includes(val) ? 'flex' : 'none'; // 'flex' para mantener d-flex
-            });
-        });
-
-        // Check All - Workers
-        document.getElementById('checkAllWorkers').addEventListener('change', function() {
-            document.querySelectorAll('.worker-check').forEach(cb => {
-                if(cb.closest('.list-group-item').style.display !== 'none') {
-                    cb.checked = this.checked;
-                }
-            });
-        });
-        
-        // Check All - Cameras
-        document.getElementById('checkAllCameras').addEventListener('change', function() {
-            document.querySelectorAll('.camera-check').forEach(cb => cb.checked = this.checked);
-        });
     </script>
 </body>
 </html>

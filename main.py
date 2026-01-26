@@ -7,6 +7,7 @@ from configuracion.base_datos import inicializar_db_offline
 from rutas_frontend import web_bp, api_bp
 import modulos.camaras as camaras
 import modulos.turnos as turnos
+import modulos.biometria as biometria
 
 # --- CONFIGURACIÓN APP FLASK ---
 app = Flask(__name__, 
@@ -33,13 +34,37 @@ def motor_asistencia_background():
         try:
             # 1. SINCRONIZACIÓN ORACLE
             turnos.sincronizar_con_oracle()
+
+            # 2. VIGILANCIA DE FOTOS (NUEVO: Aquí revisa siempre) 
+            # Esto detectará cualquier .jpg nuevo y lo encriptará al instante
+            biometria.ejecutar_migracion_automatica()
+
+            # 2. LECTURA DE CÁMARAS
+            for cam in camaras.LISTA_CAMARAS:
+                if not cam.get('ip'): continue
+
+                # (Aquí NO debe haber ninguna llamada a sincronizar_reloj_camara)
+
+                # Descargar logs
+                registros = camaras.descargar_logs_asistencia(cam)
+                if registros:
+                    nuevos = turnos.procesar_lecturas_camara(registros, cam)
+                    if nuevos > 0:
+                        print(f"📷 [Cámara {cam.get('nombre')}] {nuevos} marcas nuevas.")
+            
         except Exception as e:
             print(f"⚠️ [Motor Error] {e}")
         
-        time.sleep(2)
+        time.sleep(5)
 
 if __name__ == '__main__':
-    print("--- SISTEMA SCAF INICIANDO ---")
+    print(f"📂 [Cámaras] {len(camaras.LISTA_CAMARAS)} dispositivos cargados.")
+    
+    # AUTO-PROTECCIÓN DE FOTOS AL INICIO
+    print("🔒 [Seguridad] Verificando nuevas fotos...")
+    biometria.ejecutar_migracion_automatica()
+
+    print("--- SISTEMA INICIANDO ---")
     inicializar_db_offline()
     
     hilo_motor = threading.Thread(target=motor_asistencia_background, daemon=True)
