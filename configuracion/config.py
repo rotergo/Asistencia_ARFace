@@ -19,14 +19,9 @@ else:
     LIB_DIR_ORACLE = "/opt/oracle/instantclient"
 
 # --- CONEXIÓN ORACLE ---
-ORACLE_CFG = {
-    "host": "192.168.16.15",
-    "port": "1521",
-    "sid": "testq",
-    "user": "adempiere",
-    "pass": "test123",
-    "lib_dir": LIB_DIR_ORACLE
-}
+dsn = os.getenv('DB_HOST')
+user = os.getenv('DB_USER')
+password = os.getenv('DB_PASSWORD')
 
 # --- SEGURIDAD ---
 SECRET_KEY_HASH = "EMPRESA_SCAF_2026_SECRET_KEY_!@#" 

@@ -1,0 +1,15 @@
+# Archivos de sistema y logs
+__pycache__/
+*.pyc
+*.log
+
+# Base de datos local (Buffer) - No subir, se crea sola
+buffer_asistencia_v2.db
+
+# Secretos y Entorno - ¡MUY IMPORTANTE!
+.env
+#.venv/
+env/
+
+# Fotos biométricas (por privacidad)
+statics/fotos/*.bio
