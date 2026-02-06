@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 # 3. Instalamos dependencias del sistema necesarias para Oracle (libaio)
 RUN apt-get update && apt-get install -y \
-    libaio1 \
+    libaio1t64 \
     unzip \
     wget \
     && rm -rf /var/lib/apt/lists/*
