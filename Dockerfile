@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+RUN ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1
+
 # 4. Configurar Zona Horaria (Crítico para SHOA y Logs)
 ENV TZ="America/Santiago"
 
