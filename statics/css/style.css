@@ -4,7 +4,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
 
 :root {
-    --primary-color: #4e73df; /* Azul corporativo */
+    --primary-color: #3A5FC9; /* Tu nuevo Azul Corporativo */
     --secondary-color: #858796;
     --success-color: #1cc88a;
     --dark-bg: #f8f9fc;
@@ -17,66 +17,104 @@ body {
     color: #5a5c69;
 }
 
-/* 2. Navbar con Gradiente */
+/* 2. Navbar (Barra Superior) */
 .navbar-custom {
-    background: linear-gradient(90deg, #4e73df 0%, #224abe 100%);
+    /* Fondo base por si falla el gradiente */
+    background-color: var(--primary-color);
+    /* Gradiente sutil manteniendo tu azul #3A5FC9 */
+    background: linear-gradient(90deg, #3A5FC9 0%, #2a4bb0 100%);
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
+/* Forzar el color azul específico en todos los elementos de barra */
+.navbar, .bg-primary, .navbar-custom {
+    background-color: #3A5FC9 !important;
+}
+
+/* --- Corrección de Contraste (Texto Blanco) --- */
 .navbar-brand {
     font-weight: 600;
     letter-spacing: 1px;
-    color: white !important;
+    color: #ffffff !important;
 }
 
+.navbar-brand span {
+    color: #ffffff !important;
+    opacity: 0.9;
+}
+
+/* Enlaces e Íconos */
 .nav-link {
-    color: rgba(255,255,255,0.8) !important;
+    color: rgba(255,255,255,0.9) !important; /* Blanco casi puro */
     transition: all 0.3s;
+    font-size: 0.95rem;
 }
 
+.nav-link i {
+    color: #ffffff !important; /* Íconos totalmente blancos */
+    margin-right: 5px;
+}
+
+/* Efecto Hover (Pasar el mouse) */
 .nav-link:hover, .nav-link.active {
-    color: white !important;
+    color: #ffffff !important;
     font-weight: 600;
-    transform: translateY(-2px); /* Pequeña animación al pasar el mouse */
+    transform: translateY(-2px); /* Pequeña animación hacia arriba */
+    text-shadow: 0 0 10px rgba(255,255,255,0.3); /* Brillo suave */
 }
 
 /* 3. Tarjetas con Efecto Flotante */
 .card {
     border: none;
-    border-radius: 15px; /* Bordes redondeados */
+    border-radius: 15px;
     box-shadow: var(--card-shadow);
     transition: transform 0.3s ease;
+    background-color: #fff;
 }
 
 .card:hover {
-    transform: translateY(-5px); /* La tarjeta "flota" al pasar el mouse */
+    transform: translateY(-5px); /* Flota al pasar el mouse */
 }
 
 .card-header {
-    background-color: white;
+    background-color: #fff;
     border-bottom: 1px solid #e3e6f0;
     font-weight: 600;
-    color: #4e73df;
+    color: var(--primary-color);
     border-radius: 15px 15px 0 0 !important;
+    padding: 1rem 1.25rem;
 }
 
 /* 4. Botones Modernos */
 .btn {
-    border-radius: 50px; /* Botones redondos */
+    border-radius: 50px; /* Redondos */
     padding: 10px 25px;
     font-weight: 600;
     transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .btn-primary {
     background-color: var(--primary-color);
-    border: none;
-    box-shadow: 0 4px 6px rgba(78, 115, 223, 0.4);
+    border-color: var(--primary-color);
 }
 
 .btn-primary:hover {
-    background-color: #2e59d9;
-    box-shadow: 0 6px 8px rgba(78, 115, 223, 0.6);
+    background-color: #2a4bb0; /* Un tono más oscuro al pasar el mouse */
+    border-color: #2a4bb0;
+    box-shadow: 0 6px 8px rgba(58, 95, 201, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-warning {
+    color: #fff;
+    background-color: #f6c23e;
+    border-color: #f6c23e;
+}
+
+.btn-warning:hover {
+    color: #fff;
+    background-color: #dfa821;
 }
 
 /* 5. Tablas y Listas */
@@ -84,4 +122,34 @@ body {
     border: none;
     border-bottom: 1px solid #f0f0f0;
     padding: 15px;
+}
+
+.table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+}
+
+/* Badges (Etiquetas de estado) */
+.badge {
+    padding: 0.5em 1em;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+
+
+#tablaReporte thead th {
+    vertical-align: middle !important;
+    border-bottom: 2px solid #e3e6f0; 
+}
+
+
+#tablaReporte .bg-primary {
+    color: #ffffff !important;  /* Texto Blanco Puro */
+    
+
+    background-color: var(--primary-color) !important; 
+    --bs-bg-opacity: 1; 
 }

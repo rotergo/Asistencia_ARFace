@@ -169,10 +169,10 @@
                     item.className = 'list-group-item list-group-item-action d-flex align-items-center p-3 worker-item';
                     item.style.cursor = 'pointer';
                     item.innerHTML = `
-                        <input class="form-check-input me-3 worker-check" type="checkbox" value="${w.id}" data-name="${w.nombre}" style="transform: scale(1.2);">
+                        <input class="form-check-input me-3 worker-check" type="checkbox" value="${w.rut}" data-name="${w.nombre}" style="transform: scale(1.2);">
                         <div>
                             <div class="fw-bold text-dark">${w.nombre}</div>
-                            <small class="text-muted"><i class="fas fa-id-card me-1"></i> ${w.id}</small>
+                            <small class="text-muted"><i class="fas fa-id-card me-1"></i> ${w.rut}</small>
                         </div>
                     `;
                     container.appendChild(item);

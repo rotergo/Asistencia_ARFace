@@ -2,120 +2,203 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Vista de Fiscalización</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiscalización | ARF</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        body { background-color: #f8f9fa; }
-        .header-fiscal { background-color: #2c3e50; color: white; padding: 15px; }
-        .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        body { background-color: #f8f9fc; }
+        .navbar-custom { background-color: #2c3e50; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .navbar-custom .navbar-brand, .navbar-custom .nav-link { color: #ecf0f1; }
+        .navbar-custom .nav-link:hover { color: #3498db; }
+        .navbar-custom .nav-link.active { font-weight: bold; color: #fff; }
     </style>
 </head>
 <body>
 
-    <div class="header-fiscal d-flex justify-content-between align-items-center">
-        <h3 class="m-0">Portal de Fiscalización</h3>
-        <span class="badge bg-warning text-dark">Modo Auditoría (Solo Lectura)</span>
-    </div>
+    <nav class="navbar navbar-expand-lg navbar-custom mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand ms-3" href="#">
+                <i class="fas fa-user-shield me-2"></i> ARF <span style="font-weight: 300; opacity: 0.8;">Fiscalizador</span>
+            </a>
+                <div class="collapse navbar-collapse">
+                    <ul class="navbar-nav ms-auto me-4">
 
-    <div class="container mt-4">
-        <div class="alert alert-info">
-            <strong>Instrucciones:</strong> Utilice los filtros a continuación para buscar registros históricos de asistencia.
+                        
+                        <li class="nav-item ms-2">
+                            <a class="nav-link text-danger fw-bold" href="/fiscalizador/logout">
+                                <i class="fas fa-sign-out-alt me-1"></i> Salir
+                            </a>
+                        </li>
+                        </ul>
+                </div>
         </div>
+    </nav>
 
-        <div class="card p-4 mb-4">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Fecha Inicio</label>
-                    <input type="date" id="fechaInicio" class="form-control">
+    <div class="container pb-5">
+        <div class="card shadow mb-4 border-0">
+            <div class="card-header py-3 bg-white d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-dark"><i class="fas fa-search me-2"></i> Panel de Fiscalización</h6>
+                <span class="badge bg-warning text-dark">Modo Auditoría (Solo Lectura)</span>
+            </div>
+            <div class="card-body bg-light">
+                
+                <div class="alert alert-info border-0 shadow-sm">
+                    <i class="fas fa-info-circle me-2"></i> <strong>Instrucciones:</strong> Utilice los filtros a continuación para buscar registros o descargar la sábana oficial de asistencia.
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Fecha Fin</label>
-                    <input type="date" id="fechaFin" class="form-control">
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button class="btn btn-primary w-100" onclick="buscarRegistros()">
-                        Buscar Registros
-                    </button>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button class="btn btn-success w-100" onclick="exportarExcel()">
-                        Descargar Excel
-                    </button>
+
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Fecha Inicio</label>
+                        <input type="date" id="dateStart" class="form-control shadow-sm">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Fecha Fin</label>
+                        <input type="date" id="dateEnd" class="form-control shadow-sm">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary w-100 shadow-sm" onclick="buscarRegistros()">
+                            <i class="fas fa-search me-2"></i> Buscar Registros
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-success w-100 shadow-sm" onclick="descargarReporteFiscalizador()">
+                            <i class="fas fa-file-csv me-2"></i> Descargar Excel (DT)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="table-container">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Trabajador</th>
-                        <th>Entrada AM</th>
-                        <th>Salida AM</th>
-                        <th>Entrada PM</th>
-                        <th>Salida PM</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaResultados">
-                    <tr><td colspan="7" class="text-center text-muted">Defina un rango de fechas para buscar...</td></tr>
-                </tbody>
-            </table>
+        <div class="card shadow border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle mb-0">
+                        <thead class="bg-dark text-white">
+                            <tr>
+                                <th class="py-3 ps-3">Fecha</th>
+                                <th class="py-3">Trabajador</th>
+                                <th class="py-3">Entrada AM</th>
+                                <th class="py-3">Salida AM</th>
+                                <th class="py-3">Entrada PM</th>
+                                <th class="py-3">Salida PM</th>
+                                <th class="py-3 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTabla">
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    Ingrese un rango de fechas para visualizar los datos.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white small text-muted text-end">
+                Registros protegidos criptográficamente (SHA-256)
+            </div>
         </div>
     </div>
 
     <script>
-        // Configurar fechas por defecto (Hoy)
-        document.getElementById('fechaInicio').valueAsDate = new Date();
-        document.getElementById('fechaFin').valueAsDate = new Date();
+        // Al cargar, poner fechas de hoy por defecto
+        document.addEventListener('DOMContentLoaded', () => {
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('dateStart').value = hoy;
+            document.getElementById('dateEnd').value = hoy;
+        });
 
+        // 1. FUNCIÓN DE BÚSQUEDA (Para ver en pantalla)
         async function buscarRegistros() {
-            const inicio = document.getElementById('fechaInicio').value;
-            const fin = document.getElementById('fechaFin').value;
+            const start = document.getElementById('dateStart').value;
+            const end = document.getElementById('dateEnd').value;
+            const tbody = document.getElementById('cuerpoTabla');
 
-            const tabla = document.getElementById('tablaResultados');
-            tabla.innerHTML = '<tr><td colspan="7" class="text-center">Cargando datos... ⏳</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
 
             try {
-                // Reutilizamos la API existente de reportes que ya es de solo lectura
+                // Usamos la misma API que reportes (reutilización eficiente)
                 const res = await fetch('/api/reports/search', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ start: inicio, end: fin })
+                    body: JSON.stringify({ start, end })
                 });
-                const datos = await res.json();
+                
+                const data = await res.json();
+                tbody.innerHTML = '';
 
-                tabla.innerHTML = '';
-                if (datos.length === 0) {
-                    tabla.innerHTML = '<tr><td colspan="7" class="text-center">No se encontraron registros en este rango.</td></tr>';
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron registros en este periodo.</td></tr>';
                     return;
                 }
 
-                datos.forEach(d => {
-                    const row = `
+                data.forEach(row => {
+                    let badge = 'bg-secondary';
+                    if(row.estado === 'OK' || row.estado === 'CERRADO') badge = 'bg-success';
+                    if(row.estado === 'ATRASO') badge = 'bg-warning text-dark';
+                    if(row.estado === 'AUSENTE') badge = 'bg-danger';
+
+                    tbody.innerHTML += `
                         <tr>
-                            <td>${d.fecha} <small class="text-muted">(${d.dia})</small></td>
-                            <td><strong>${d.nombre}</strong><br><small class="text-muted">ID: ${d.id}</small></td>
-                            <td>${d.e_am}</td>
-                            <td>${d.s_am}</td>
-                            <td>${d.e_pm}</td>
-                            <td>${d.s_pm}</td>
-                            <td>${d.estado === 'OK' ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-secondary">Incompleto</span>'}</td>
+                            <td class="ps-3 fw-bold text-muted">${row.fecha} <small class="fw-normal">(${row.dia})</small></td>
+                            <td>
+                                <div class="fw-bold">${row.nombre}</div>
+                                <div class="small text-muted">ID: ${row.id}</div>
+                            </td>
+                            <td class="font-monospace">${row.e_am || '-'}</td>
+                            <td class="font-monospace text-muted">${row.s_am || '-'}</td>
+                            <td class="font-monospace">${row.e_pm || '-'}</td>
+                            <td class="font-monospace text-muted">${row.s_pm || '-'}</td>
+                            <td class="text-center"><span class="badge ${badge}">${row.estado || 'N/A'}</span></td>
                         </tr>
                     `;
-                    tabla.innerHTML += row;
                 });
 
             } catch (error) {
-                console.error(error);
-                tabla.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error conectando con el servidor.</td></tr>';
+                console.error("Error búsqueda:", error);
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error de conexión: ${error}</td></tr>`;
             }
         }
 
-        function exportarExcel() {
-            alert("Funcionalidad de descarga disponible para el auditor.");
-            // Aquí puedes conectar la misma función de exportar a Excel que ya tienes en reports.html
+        // 2. FUNCIÓN DE DESCARGA (La que estaba fallando)
+        function descargarReporteFiscalizador() {
+            console.log("🟢 Iniciando proceso de descarga...");
+            
+            // Obtenemos los elementos
+            const inputInicio = document.getElementById('dateStart');
+            const inputFin = document.getElementById('dateEnd');
+
+            // Verificación de seguridad
+            if (!inputInicio || !inputFin) {
+                alert("Error crítico: No se encuentran los campos de fecha en el HTML.");
+                return;
+            }
+
+            const valInicio = inputInicio.value;
+            const valFin = inputFin.value;
+
+            console.log(`Fechas seleccionadas: ${valInicio} a ${valFin}`);
+
+            if (!valInicio || !valFin) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Faltan fechas',
+                    text: 'Por favor selecciona la fecha de inicio y fin.'
+                });
+                return;
+            }
+
+            // Construcción de la URL de descarga
+            const urlFinal = `/api/reports/export_dt?start=${valInicio}&end=${valFin}`;
+            
+            console.log("🔗 Navegando a:", urlFinal);
+            
+            // Forzar la navegación (esto inicia la descarga)
+            window.location.href = urlFinal;
         }
     </script>
 </body>

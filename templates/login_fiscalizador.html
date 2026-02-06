@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Fiscalización DT</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 100%; max-width: 400px; text-align: center; }
+        .logo { font-size: 40px; margin-bottom: 20px; }
+        h2 { color: #333; margin-bottom: 5px; }
+        p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        button { width: 96%; padding: 12px; background-color: #0056b3; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #004494; }
+        .hidden { display: none; }
+        .alert { color: red; font-size: 14px; margin-top: 10px; }
+        .step-2 { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="logo">🇨🇱</div>
+    <h2>Portal de Fiscalización</h2>
+    <p>Acceso exclusivo Dirección del Trabajo</p>
+
+    <div id="step1">
+        <input type="email" id="email" placeholder="ejemplo@dt.gob.cl">
+        <button onclick="solicitarClave()">Solicitar Clave de Acceso</button>
+    </div>
+
+    <div id="step2" class="hidden step-2">
+        <p>Se ha enviado una clave a: <b id="email-display"></b></p>
+        <input type="text" id="token" placeholder="Ingrese Clave de 6 dígitos" maxlength="6" style="letter-spacing: 5px; text-align: center; font-weight: bold;">
+        <button onclick="entrar()">INGRESAR</button>
+        <br><br>
+        <small style="cursor: pointer; color: blue;" onclick="location.reload()">Volver</small>
+    </div>
+
+    <div id="mensaje" class="alert"></div>
+</div>
+
+<script>
+    function solicitarClave() {
+        const email = document.getElementById('email').value;
+        const msg = document.getElementById('mensaje');
+        
+        if (!email.includes('@')) {
+            msg.innerText = "Ingrese un correo válido";
+            return;
+        }
+
+        msg.innerText = "Conectando con servidor...";
+        
+        const formData = new FormData();
+        formData.append('email', email);
+
+        fetch('/api/auth/request_token', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+                document.getElementById('email-display').innerText = email;
+                msg.innerText = "";
+            } else {
+                msg.innerText = data.message;
+            }
+        });
+    }
+
+    function entrar() {
+        const email = document.getElementById('email').value;
+        const token = document.getElementById('token').value;
+        const msg = document.getElementById('mensaje');
+
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('token', token);
+
+        fetch('/api/auth/login_fiscalizador', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                window.location.href = data.redirect;
+            } else {
+                msg.innerText = data.message;
+            }
+        });
+    }
+</script>
+
+</body>

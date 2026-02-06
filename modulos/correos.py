@@ -41,7 +41,7 @@ def enviar_comprobante(nombre, email_destinatario, fecha, hora, tipo, dispositiv
                 </tr>
             </table>
             <p style="font-size: 10px; color: #999; margin-top: 20px;">
-                Este es un correo automático generado por el sistema SCAF según la Normativa de la DT.
+                Este es un correo automático generado por el sistema según la Normativa de la DT.
             </p>
         </div>
     </body>

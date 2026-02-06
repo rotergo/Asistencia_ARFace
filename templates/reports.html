@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportes | ARF</title>
+    <title>Reportes de Asistencia | ARF</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
-<body>
+<body class="bg-light">
 
-    <nav class="navbar navbar-expand-lg navbar-custom mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand ms-3" href="#">
-                <i class="fas fa-fingerprint me-2"></i> ARF <span style="font-weight: 300; opacity: 0.8;">Admin</span>
+            <a class="navbar-brand ms-3 fw-bold" href="#">
+                <i class="fas fa-fingerprint me-2"></i> ARF <span class="fw-light opacity-75">Admin</span>
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav ms-auto me-4">
@@ -31,49 +32,48 @@
     <div class="container pb-5">
         
         <div class="card shadow mb-4 border-0">
-            <div class="card-header py-3 bg-white">
-                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter me-2"></i> Generar Reporte de Asistencia</h6>
+            <div class="card-header py-3 bg-white d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter me-2"></i> Filtros de Búsqueda</h6>
             </div>
-            <div class="card-body bg-light">
+            <div class="card-body bg-white">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted text-uppercase">Fecha Inicio</label>
-                        <input type="date" id="dateStart" class="form-control shadow-sm">
+                        <input type="date" id="dateStart" class="form-control">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted text-uppercase">Fecha Fin</label>
-                        <input type="date" id="dateEnd" class="form-control shadow-sm">
+                        <input type="date" id="dateEnd" class="form-control">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted text-uppercase">Trabajador</label>
-                        <select id="selectWorker" class="form-select shadow-sm">
-                            <option value="all">👥 Todos los trabajadores</option>
+                        <select id="selectWorker" class="form-select">
+                            <option value="all">Todos los trabajadores</option>
                         </select>
                     </div>
                     <div class="col-md-3 d-flex gap-2">
-                        <button class="btn btn-primary flex-grow-1 shadow-sm rounded-pill" onclick="buscarReporte()">
+                        <button class="btn btn-primary flex-grow-1 shadow-sm" onclick="buscarReporte()">
                             <i class="fas fa-search me-2"></i> Buscar
                         </button>
-
-                        <button class="btn btn-warning flex-grow-1 shadow-sm rounded-pill ms-2 text-dark fw-bold" onclick="ejecutarAuditoria()">
-                            <i class="fas fa-user-secret me-2"></i> Auditar Datos
+                        <button class="btn btn-warning flex-grow-1 shadow-sm text-dark fw-bold" onclick="ejecutarAuditoria()">
+                            <i class="fas fa-shield-alt me-2"></i> Auditar
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow mb-4 border-start border-success border-4">
+        <div class="card shadow mb-4 border-start border-success border-5">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <h5 class="text-success fw-bold mb-1"><i class="fas fa-file-contract me-2"></i> Exportación Legal (Dirección del Trabajo)</h5>
+                    <h5 class="text-success fw-bold mb-1"><i class="fas fa-balance-scale me-2"></i> Exportación Legal (DT)</h5>
                     <p class="mb-0 text-muted small">
-                        Descarga el reporte en formato <strong>CSV estricto (;)</strong> con las columnas exigidas por la Resolución Exenta N° 38.
+                        Genera el archivo CSV estricto según la <strong>Resolución Exenta N° 38</strong>.
                     </p>
                 </div>
                 <div>
-                    <a href="/api/reports/export_dt" target="_blank" class="btn btn-success btn-lg shadow rounded-pill px-4">
-                        <i class="fas fa-download me-2"></i> Descargar Anexo DT
+                    <a href="/api/reports/export_dt" target="_blank" class="btn btn-outline-success btn-lg shadow-sm px-4">
+                        <i class="fas fa-file-csv me-2"></i> Descargar Anexo
                     </a>
                 </div>
             </div>
@@ -85,19 +85,19 @@
                     <table class="table table-hover align-middle mb-0" id="tablaReporte">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-4 py-3 text-secondary">FECHA</th>
-                                <th class="text-secondary">DÍA</th>
-                                <th class="text-secondary">TRABAJADOR</th>
-                                <th class="text-center text-primary bg-primary bg-opacity-10">ENTRADA AM</th>
-                                <th class="text-center text-secondary">SALIDA AM</th>
-                                <th class="text-center text-primary bg-primary bg-opacity-10">ENTRADA PM</th>
-                                <th class="text-center text-secondary">SALIDA PM</th>
-                                <th class="text-center text-secondary">ESTADO</th>
-                            </tr>
+                                <th class="ps-4 py-3 text-secondary text-uppercase small">Fecha</th>
+                                <th class="text-secondary text-uppercase small">Día</th>
+                                <th class="text-secondary text-uppercase small">Trabajador</th>
+                                <th class="text-center text-primary bg-primary bg-opacity-10 small">Entrada AM</th>
+                                <th class="text-center text-secondary small">Salida AM</th>
+                                <th class="text-center text-primary bg-primary bg-opacity-10 small">Entrada PM</th>
+                                <th class="text-center text-secondary small">Salida PM</th>
+                                <th class="text-center text-secondary text-uppercase small">Estado</th>
+                                <th class="text-center text-secondary text-uppercase small">Acciones</th> </tr>
                         </thead>
-                        <tbody id="cuerpoTabla">
+                        <tbody id="cuerpoTabla" class="bg-white">
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <div class="py-4">
                                         <i class="fas fa-search fa-3x mb-3 opacity-25"></i><br>
                                         Selecciona un rango de fechas y presiona <strong>Buscar</strong>.
@@ -109,7 +109,61 @@
                 </div>
             </div>
             <div class="card-footer bg-white small text-muted text-end">
-                <span id="contadorResultados">0</span> registros encontrados
+                Encontrados: <span id="contadorResultados" class="fw-bold">0</span> registros
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalRectificar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i> Rectificar Asistencia</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small">
+                        <i class="fas fa-exclamation-triangle me-1"></i> 
+                        <strong>Atención:</strong> Según la Res. 38, esta acción anulará el registro original y creará uno nuevo marcado como MANUAL.
+                    </div>
+                    <form id="formRectificar">
+                        <input type="hidden" id="rect_id_original">
+                        <input type="hidden" id="rect_rut">
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Entrada AM</label>
+                                <input type="time" id="rect_e_am" class="form-control font-monospace">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Salida AM</label>
+                                <input type="time" id="rect_s_am" class="form-control font-monospace">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Entrada PM</label>
+                                <input type="time" id="rect_e_pm" class="form-control font-monospace">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Salida PM</label>
+                                <input type="time" id="rect_s_pm" class="form-control font-monospace">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Responsable (Tu Usuario)</label>
+                            <input type="text" id="rect_admin" class="form-control" required placeholder="Ej: admin_rrhh">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Motivo de la Modificación</label>
+                            <textarea id="rect_motivo" class="form-control" rows="2" required placeholder="Ej: Olvido de marca..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="enviarRectificacion()">Firmar y Guardar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -117,6 +171,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('dateStart').value = hoy;
@@ -124,6 +179,7 @@
             cargarTrabajadores();
         });
 
+        // Cargar lista desplegable
         function cargarTrabajadores() {
             fetch('/api/workers/list')
                 .then(r => r.json())
@@ -131,20 +187,21 @@
                     const select = document.getElementById('selectWorker');
                     data.forEach(w => {
                         const opt = document.createElement('option');
-                        opt.value = w.id;
+                        opt.value = w.rut; // OJO: Usar RUT o ID según tu BD
                         opt.text = w.nombre;
                         select.appendChild(opt);
                     });
                 });
         }
 
+        // Buscar Registros
         async function buscarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
             const worker = document.getElementById('selectWorker').value;
             const tbody = document.getElementById('cuerpoTabla');
 
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
 
             try {
                 const res = await fetch('/api/reports/search', {
@@ -158,89 +215,146 @@
                 document.getElementById('contadorResultados').innerText = data.length;
 
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">No se encontraron registros.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted">No se encontraron registros.</td></tr>';
                     return;
                 }
 
                 data.forEach(row => {
-                    let badgeClass = 'bg-warning text-dark';
-                    if(row.estado === 'OK' || row.estado === 'CERRADO') badgeClass = 'bg-success';
-                    if(row.estado === 'AUSENTE') badgeClass = 'bg-danger';
-                    if(row.estado === 'PENDIENTE') badgeClass = 'bg-secondary';
+                    // Lógica visual de estados
+                    let badgeClass = 'bg-secondary';
+                    if(row.estado === 'CERRADO') badgeClass = 'bg-success';
+                    if(row.estado === 'PENDIENTE') badgeClass = 'bg-warning text-dark';
+                    if(row.estado === 'TURNO EN DESCANSO') badgeClass = 'bg-info text-dark';
+                    if(row.estado === 'INCIDENCIA') badgeClass = 'bg-danger';
 
-                    const fmtHora = (h) => (!h || h === '-') ? '<span class="text-muted opacity-25">--:--</span>' : `<strong>${h}</strong>`;
+                    // Formateador de horas (pone --:-- si es null)
+                    const fmt = (h) => (!h || h === '-') ? '<span class="text-muted opacity-25">--:--</span>' : `<strong>${h}</strong>`;
 
+                    // Detectar si fue modificado manualmente
+                    let iconManual = row.tipo_registro === 'MANUAL' ? '<i class="fas fa-edit text-warning ms-1" title="Rectificado Manualmente"></i>' : '';
+
+                    // Inyección de HTML
                     tbody.innerHTML += `
                         <tr>
-                            <td class="ps-4 align-middle">${row.fecha}</td>
+                            <td class="ps-4 align-middle font-monospace">${row.fecha}</td>
                             <td class="align-middle text-muted small text-uppercase fw-bold">${row.dia}</td>
-                            <td class="align-middle fw-bold text-dark">${row.nombre}</td>
-                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmtHora(row.e_am)}</td>
-                            <td class="text-center align-middle font-monospace text-secondary">${fmtHora(row.s_am)}</td>
-                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmtHora(row.e_pm)}</td>
-                            <td class="text-center align-middle font-monospace text-secondary">${fmtHora(row.s_pm)}</td>
-                            <td class="text-center align-middle"><span class="badge ${badgeClass} rounded-pill px-3 shadow-sm">${row.estado || 'Pendiente'}</span></td>
+                            <td class="align-middle fw-bold text-dark">
+                                ${row.nombre} ${iconManual}
+                            </td>
+                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmt(row.e_am)}</td>
+                            <td class="text-center align-middle font-monospace text-secondary">${fmt(row.s_am)}</td>
+                            <td class="text-center align-middle font-monospace text-primary bg-primary bg-opacity-10">${fmt(row.e_pm)}</td>
+                            <td class="text-center align-middle font-monospace text-secondary">${fmt(row.s_pm)}</td>
+                            <td class="text-center align-middle">
+                                <span class="badge ${badgeClass} rounded-pill px-3 shadow-sm">${row.estado}</span>
+                                <div class="small text-muted" style="font-size:0.7em">${row.detalle || ''}</div>
+                            </td>
+                            <td class="text-center align-middle">
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                    onclick='abrirModalRectificar(${JSON.stringify(row)})'>
+                                    <i class="fas fa-pencil-alt"></i>
+                                </button>
+                            </td>
                         </tr>
                     `;
                 });
 
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error: ${error}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error: ${error}</td></tr>`;
             }
         }
 
+        // --- LÓGICA DE RECTIFICACIÓN ---
+
+        // 1. Abrir Modal y llenar datos
+        function abrirModalRectificar(row) {
+            document.getElementById('rect_id_original').value = row.id_secuencia;
+            document.getElementById('rect_rut').value = row.rut; // Asegúrate que el backend mande el RUT
+            
+            // Llenar inputs con valores actuales (o vacíos si es --:--)
+            document.getElementById('rect_e_am').value = row.e_am !== '-' ? row.e_am : '';
+            document.getElementById('rect_s_am').value = row.s_am !== '-' ? row.s_am : '';
+            document.getElementById('rect_e_pm').value = row.e_pm !== '-' ? row.e_pm : '';
+            document.getElementById('rect_s_pm').value = row.s_pm !== '-' ? row.s_pm : '';
+
+            document.getElementById('rect_motivo').value = ''; // Limpiar motivo
+            
+            // Mostrar Modal Bootstrap
+            const modal = new bootstrap.Modal(document.getElementById('modalRectificar'));
+            modal.show();
+        }
+
+        // 2. Enviar datos al Backend
+        async function enviarRectificacion() {
+            const data = {
+                id_original: document.getElementById('rect_id_original').value,
+                rut: document.getElementById('rect_rut').value,
+                nuevas_horas: {
+                    entrada_am: document.getElementById('rect_e_am').value,
+                    salida_am: document.getElementById('rect_s_am').value,
+                    entrada_pm: document.getElementById('rect_e_pm').value,
+                    salida_pm: document.getElementById('rect_s_pm').value
+                },
+                admin_user: document.getElementById('rect_admin').value,
+                motivo: document.getElementById('rect_motivo').value
+            };
+
+            if(!data.admin_user || !data.motivo) {
+                Swal.fire('Error', 'Debes indicar responsable y motivo obligatoriamente.', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/reports/rectify', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if(result.status === 'ok') {
+                    Swal.fire('Éxito', 'Registro rectificado correctamente.', 'success');
+                    // Cerrar modal y recargar tabla
+                    const modalEl = document.getElementById('modalRectificar');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+                    buscarReporte(); 
+                } else {
+                    Swal.fire('Error', result.msg, 'error');
+                }
+            } catch (e) {
+                Swal.fire('Error de Red', str(e), 'error');
+            }
+        }
+
+        // --- AUDITORÍA DE SEGURIDAD ---
         async function ejecutarAuditoria() {
             const tbody = document.getElementById('cuerpoTabla');
-            const thead = document.querySelector('#tablaReporte thead tr');
-
-            // Limpiamos y mostramos spinner
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><div class="spinner-grow text-warning"></div><div class="mt-2">Analizando integridad criptográfica...</div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5"><div class="spinner-grow text-warning"></div><div class="mt-2">Auditando integridad criptográfica...</div></td></tr>';
 
             try {
                 const res = await fetch('/api/security/audit');
                 const data = await res.json();
                 
-                // Si todo está perfecto
                 if (data.status === "OK") {
-                    // SweetAlert o un mensaje bonito en la tabla
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <div class="text-success display-1"><i class="fas fa-shield-alt"></i></div>
-                                <h3 class="text-success mt-3">Integridad al 100%</h3>
-                                <p class="text-muted">Se revisaron ${data.revisados} registros y todos son auténticos.</p>
-                            </td>
-                        </tr>
-                    `;
-                } else if (data.status === "PELIGRO") {
-                    // Mostramos los registros corruptos
-                    thead.innerHTML = `
-                        <th>ID</th>
-                        <th>RUT TRABAJADOR</th>
-                        <th>FECHA</th>
-                        <th>TIPO ERROR</th>
-                        <th>DETALLE TÉCNICO</th>
-                        <th>ESTADO</th>
-                    `;
-                    
-                    let html = '';
+                    Swal.fire('Integridad Verificada', `Se revisaron ${data.revisados} registros y todos son auténticos.`, 'success');
+                    buscarReporte(); // Volver a cargar la tabla normal
+                } else {
+                    // Mostrar tabla de errores si hay corrupción
+                    tbody.innerHTML = '';
                     data.detalles.forEach(item => {
-                        html += `
+                         tbody.innerHTML += `
                             <tr class="table-danger">
-                                <td class="fw-bold">#${item.id}</td>
-                                <td>${item.trabajador}</td>
-                                <td>${item.fecha}</td>
-                                <td class="text-danger fw-bold">⚠️ MANIPULADO</td>
-                                <td>${item.detalle}</td>
-                                <td><span class="badge bg-danger">INVALIDO</span></td>
+                                <td colspan="9" class="text-center">
+                                    <strong>⚠️ ERROR DE INTEGRIDAD DETECTADO</strong><br>
+                                    ID: ${item.id} | Trabajador: ${item.trabajador} | Error: ${item.detalle}
+                                </td>
                             </tr>
                         `;
                     });
-                    tbody.innerHTML = html;
                 }
-
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error auditoría: ${e}</td></tr>`;
+                Swal.fire('Error', 'Fallo en auditoría', 'error');
             }
         }
     </script>

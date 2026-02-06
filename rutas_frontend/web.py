@@ -3,6 +3,7 @@ from rutas_frontend import web_bp
 from configuracion.base_datos import obtener_conexion_oracle
 import modulos.turnos as turnos
 import modulos.camaras as camaras
+from flask import session, render_template, redirect, url_for
 
 @web_bp.route('/')
 def dashboard():
@@ -52,9 +53,25 @@ def reports_page():
 def data_page():
     return render_template('data.html')
 
-# --- RUTA FISCALIZADOR (SOLO LECTURA) ---
-@web_bp.route('/fiscalizador')
-def view_fiscalizador():
-    # Aquí en el futuro podrías poner un login simple:
-    # if not session.get('es_fiscalizador'): return redirect('/login')
+# --- CORRECCIÓN EN rutas_frontend/web.py ---
+
+@web_bp.route('/fiscalizador/login', methods=['GET'])
+def fiscalizador_login_page():
+    if session.get('rol') == 'FISCALIZADOR':
+        # CAMBIO AQUÍ: 'web_bp' en lugar de 'web'
+        return redirect(url_for('web_bp.fiscalizador_dashboard')) 
+    return render_template('login_fiscalizador.html')
+
+@web_bp.route('/fiscalizador', methods=['GET'])
+def fiscalizador_dashboard():
+    if session.get('rol') != 'FISCALIZADOR':
+        # CAMBIO AQUÍ: 'web_bp' en lugar de 'web'
+        return redirect(url_for('web_bp.fiscalizador_login_page'))
+    
     return render_template('fiscalizador.html')
+
+@web_bp.route('/fiscalizador/logout')
+def logout_fiscalizador():
+    session.pop('rol', None)
+    # CAMBIO AQUÍ: 'web_bp' en lugar de 'web'
+    return redirect(url_for('web_bp.fiscalizador_login_page'))
