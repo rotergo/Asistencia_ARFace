@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from configuracion.base_datos import obtener_conexion_oracle
 from modulos import rectificacion
 import modulos.camaras as camaras_mod
-from modulos.camaras import distribuir_foto_a_camaras
 import modulos.turnos as turnos
 import io
 import csv
