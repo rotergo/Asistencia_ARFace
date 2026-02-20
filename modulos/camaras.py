@@ -288,13 +288,12 @@ def sincronizar_reloj_camara(cam_config):
     return False
 
 # --- NUEVA FUNCIÓN PARA GESTIONAR SUBIDA DE FOTOS DESDE LA WEB ---
-def distribuir_foto_a_camaras(rut_usuario, nombre_usuario, imagen_bytes, filename_original):
+def guardar_foto_local(rut_usuario, nombre_usuario, imagen_bytes, filename_original):
     """ 
-    Guarda la foto en el disco (para persistencia) y la distribuye 
-    inmediatamente a todas las cámaras usando el protocolo existente.
+    SOLO guarda la foto en el disco del servidor (statics/fotos).
+    NO la envía a las cámaras automáticamente.
+    El envío se realiza después mediante el botón "Sincronizar Ahora".
     """
-    resultados = []
-    
     try:
         # 1. Guardar la foto en la carpeta statics/fotos con formato RUT.jpg
         directorio_actual = os.path.dirname(os.path.abspath(__file__))
@@ -305,30 +304,15 @@ def distribuir_foto_a_camaras(rut_usuario, nombre_usuario, imagen_bytes, filenam
         uid_clean = resultado.replace("-", "") if es_valido else rut_usuario.replace(".", "").replace("-", "").strip()
         rut_con_guion = f"{uid_clean[:-1]}-{uid_clean[-1]}" if len(uid_clean) > 1 else uid_clean
         
-        # Guardamos siempre como .jpg, luego biometria.py lo encriptará si tienes el hilo corriendo
+        # Guardamos siempre como .jpg
         ruta_jpg = os.path.join(ruta_fotos_dir, f"{rut_con_guion}.jpg")
         
         with open(ruta_jpg, "wb") as f:
             f.write(imagen_bytes)
-        print(f"💾 [Upload] Foto guardada localmente: {ruta_jpg}")
+        print(f"💾 [Upload] Foto vinculada a {rut_con_guion} y guardada en servidor.")
+        
+        return {'ok': True, 'msg': 'Foto guardada correctamente en el servidor.'}
+
     except Exception as e:
         print(f"⚠️ [Upload Error] No se pudo guardar foto: {e}")
-        return [{'ok': False, 'error': f"Fallo al guardar archivo local: {e}"}]
-
-    # 2. Enviar a cada cámara registrada reciclando tu lógica
-    for cam in LISTA_CAMARAS:
-        if not cam.get('ip'): continue
-        
-        ip = cam.get('ip')
-        nombre_cam = cam.get('nombre', ip)
-        print(f"🔄 [Upload] Intentando subir foto a cámara {nombre_cam}...")
-        
-        # enviar_usuario_a_camara leerá la foto recién guardada y la subirá en Base64
-        res = enviar_usuario_a_camara(cam, rut_usuario, nombre_usuario)
-        
-        if "OK" in res:
-            resultados.append({'ip': ip, 'ok': True, 'msg': res})
-        else:
-            resultados.append({'ip': ip, 'ok': False, 'error': res})
-    
-    return resultados
+        return {'ok': False, 'error': f"Fallo al guardar archivo local: {e}"}

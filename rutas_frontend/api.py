@@ -110,16 +110,15 @@ def api_subir_foto(rut_trabajador):
     
     try:
         imagen_bytes = file.read()
-        resultados = distribuir_foto_a_camaras(rut_trabajador, nombre_trabajador, imagen_bytes, file.filename)
         
-        exitos = sum(1 for r in resultados if r['ok'])
-        errores = [r['ip'] + ": " + r.get('error','') for r in resultados if not r['ok']]
+        # Ahora llamamos a la función que SOLO guarda en disco
+        resultado = camaras_mod.guardar_foto_local(rut_trabajador, nombre_trabajador, imagen_bytes, file.filename)
         
-        if exitos == 0 and errores:
-             return jsonify({'ok': False, 'error': f"Fallo en cámaras: {'; '.join(errores)}"}), 500
-             
-        mensaje = f"Enviada a {exitos} equipos."
-        return jsonify({'ok': True, 'mensaje': mensaje})
+        if resultado['ok']:
+             mensaje = "Foto guardada. Usa 'Sincronizar Ahora' para enviarla a los equipos."
+             return jsonify({'ok': True, 'mensaje': mensaje})
+        else:
+             return jsonify({'ok': False, 'error': resultado['error']}), 500
 
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
