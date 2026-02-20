@@ -94,8 +94,6 @@ def enviar_usuario_a_camara(cam_config, uid, nombre):
         return f"Error: RUT Inválido ({resultado})"
     
     # Si es válido, usamos el RUT limpio y formateado que nos devolvió la función
-    # (La función devuelve ej: '12345678-K', la cámara suele necesitar '12345678K' o sin guión)
-    # Tu sistema usa sin guión para el ID de la cámara, así que lo limpiamos de nuevo:
     uid_clean = resultado.replace("-", "") 
 
     # --- INICIO LÓGICA ORIGINAL ---
@@ -244,7 +242,6 @@ cargar_configuracion()
 def sincronizar_reloj_camara(cam_config):
     """
     Configura la cámara para que se sincronice AUTOMÁTICAMENTE con el SHOA
-    usando el comando nativo descubierto: 'ar_cmd_set_ntpparam'.
     """
     session = _crear_sesion()
     base_url = f"http://{cam_config['ip']}:{cam_config.get('puerto', 80)}/fcgi-bin/dispatch.fcgi"
@@ -252,7 +249,6 @@ def sincronizar_reloj_camara(cam_config):
     
     print(f"⏳ [Reloj] Configurando NTP SHOA en {cam_config.get('nombre')}...")
 
-    # 1. LOGIN
     try:
         payload_login = {
             "cmd": "ar_cmd_login",
@@ -263,17 +259,11 @@ def sincronizar_reloj_camara(cam_config):
         }
         r = session.post(base_url, json=payload_login, headers=headers, timeout=4)
         if r.status_code != 200: 
-            print("   ⚠️ Error HTTP en Login")
             return False
     except Exception as e:
-        print(f"   ⚠️ Error conexión: {e}")
         return False
 
-    # 2. ENVIAR COMANDO DE NTP (Payload exacto capturado del navegador)
     try:
-        # Construimos el objeto interno NtpParam
-        # Nota: 'update_cycle' está en segundos. Ponemos 3600 (1 hora) para mayor precisión.
-        # 'time_zone': "CST+3:00:00" corresponde a GMT-3 (Chile Continental/Verano aprox)
         ntp_params = {
             "NtpParam": {
                 "enabled": "true",
@@ -283,23 +273,62 @@ def sincronizar_reloj_camara(cam_config):
                 "time_zone": "CST+3:00:00" 
             }
         }
-
         payload_ntp = {
             "cmd": "ar_cmd_set_ntpparam",
             "payload": json.dumps(ntp_params)
         }
-
         r = session.post(base_url, json=payload_ntp, headers=headers, timeout=5)
         resp = r.json()
 
-        # Verificamos la respuesta
         if resp.get('status') == 0 or str(resp.get('ret')).upper() == 'OK':
             print(f"✅ [Reloj] ÉXITO. Cámara sincronizada con ntp.shoa.cl (GMT-3).")
             return True
-        else:
-            print(f"   ⚠️ La cámara rechazó el comando: {resp}")
-
     except Exception as e:
-        print(f"   ⚠️ Error enviando configuración NTP: {e}")
-
+        pass
     return False
+
+# --- NUEVA FUNCIÓN PARA GESTIONAR SUBIDA DE FOTOS DESDE LA WEB ---
+def distribuir_foto_a_camaras(rut_usuario, nombre_usuario, imagen_bytes, filename_original):
+    """ 
+    Guarda la foto en el disco (para persistencia) y la distribuye 
+    inmediatamente a todas las cámaras usando el protocolo existente.
+    """
+    resultados = []
+    
+    try:
+        # 1. Guardar la foto en la carpeta statics/fotos con formato RUT.jpg
+        directorio_actual = os.path.dirname(os.path.abspath(__file__))
+        ruta_fotos_dir = os.path.join(os.path.dirname(directorio_actual), "statics", "fotos")
+        os.makedirs(ruta_fotos_dir, exist_ok=True)
+        
+        es_valido, resultado = validar_rut(rut_usuario)
+        uid_clean = resultado.replace("-", "") if es_valido else rut_usuario.replace(".", "").replace("-", "").strip()
+        rut_con_guion = f"{uid_clean[:-1]}-{uid_clean[-1]}" if len(uid_clean) > 1 else uid_clean
+        
+        # Guardamos siempre como .jpg, luego biometria.py lo encriptará si tienes el hilo corriendo
+        ruta_jpg = os.path.join(ruta_fotos_dir, f"{rut_con_guion}.jpg")
+        
+        with open(ruta_jpg, "wb") as f:
+            f.write(imagen_bytes)
+        print(f"💾 [Upload] Foto guardada localmente: {ruta_jpg}")
+    except Exception as e:
+        print(f"⚠️ [Upload Error] No se pudo guardar foto: {e}")
+        return [{'ok': False, 'error': f"Fallo al guardar archivo local: {e}"}]
+
+    # 2. Enviar a cada cámara registrada reciclando tu lógica
+    for cam in LISTA_CAMARAS:
+        if not cam.get('ip'): continue
+        
+        ip = cam.get('ip')
+        nombre_cam = cam.get('nombre', ip)
+        print(f"🔄 [Upload] Intentando subir foto a cámara {nombre_cam}...")
+        
+        # enviar_usuario_a_camara leerá la foto recién guardada y la subirá en Base64
+        res = enviar_usuario_a_camara(cam, rut_usuario, nombre_usuario)
+        
+        if "OK" in res:
+            resultados.append({'ip': ip, 'ok': True, 'msg': res})
+        else:
+            resultados.append({'ip': ip, 'ok': False, 'error': res})
+    
+    return resultados

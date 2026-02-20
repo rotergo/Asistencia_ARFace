@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from configuracion.base_datos import obtener_conexion_oracle
 from modulos import rectificacion
 import modulos.camaras as camaras_mod
+from modulos.camaras import distribuir_foto_a_camaras
 import modulos.turnos as turnos
 import io
 import csv
@@ -99,6 +100,30 @@ def sync_execute():
 
     return jsonify({"status": "ok", "logs": log_resultados})
 
+@api_bp.route('/subir_foto/<rut_trabajador>', methods=['POST'])
+def api_subir_foto(rut_trabajador):
+    if 'archivo_foto' not in request.files:
+        return jsonify({'ok': False, 'error': 'No se envió imagen.'}), 400
+    
+    file = request.files['archivo_foto']
+    nombre_trabajador = request.form.get('nombre', 'Desconocido')
+    
+    try:
+        imagen_bytes = file.read()
+        resultados = distribuir_foto_a_camaras(rut_trabajador, nombre_trabajador, imagen_bytes, file.filename)
+        
+        exitos = sum(1 for r in resultados if r['ok'])
+        errores = [r['ip'] + ": " + r.get('error','') for r in resultados if not r['ok']]
+        
+        if exitos == 0 and errores:
+             return jsonify({'ok': False, 'error': f"Fallo en cámaras: {'; '.join(errores)}"}), 500
+             
+        mensaje = f"Enviada a {exitos} equipos."
+        return jsonify({'ok': True, 'mensaje': mensaje})
+
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 # --- GESTIÓN DE DISPOSITIVOS ---
 @api_bp.route('/devices/list_simple')
 def list_devices_simple():
@@ -138,10 +163,9 @@ def reports_search():
     if conn:
         try:
             cur = conn.cursor()
-            # SELECCIONAMOS SOLO COLUMNAS REALES (Sin DETALLE)
             sql = """
                 SELECT ID_SECUENCIA, ID_TRABAJADOR, NOMBRE_TRABAJADOR, TO_CHAR(FECHA_DIA, 'YYYY-MM-DD'), 
-                       DIA_SEMANA, ENTRADA_AM, SALIDA_AM, ENTRADA_PM, SALIDA_PM, ESTADO, TIPO_REGISTRO
+                       DIA_SEMANA, HORA_MARCA, AREA
                 FROM ERPG_PASO_CAMARA
                 WHERE FECHA_DIA BETWEEN TO_DATE(:1, 'YYYY-MM-DD') AND TO_DATE(:2, 'YYYY-MM-DD')
             """
@@ -151,24 +175,20 @@ def reports_search():
                 sql += " AND ID_TRABAJADOR = :3"
                 params.append(worker_id)
 
-            sql += " ORDER BY FECHA_DIA DESC, NOMBRE_TRABAJADOR ASC"
+            sql += " ORDER BY FECHA_DIA DESC, HORA_MARCA DESC, NOMBRE_TRABAJADOR ASC"
             
             cur.execute(sql, params)
             
             for row in cur:
+                # AHORA SÍ MANDAMOS LOS NOMBRES QUE ESPERA EL HTML NUEVO
                 resultados.append({
                     "id_secuencia": row[0],
                     "rut": row[1], 
                     "nombre": row[2], 
                     "fecha": row[3], 
                     "dia": row[4],
-                    "e_am": row[5] or "-", 
-                    "s_am": row[6] or "-",
-                    "e_pm": row[7] or "-", 
-                    "s_pm": row[8] or "-", 
-                    "estado": row[9],        # ESTADO (Ej: 'TURNO EN DESCANSO')
-                    "detalle": row[9],       # Usamos ESTADO también como detalle visual
-                    "tipo_registro": row[10] # TIPO_REGISTRO
+                    "hora_marca": row[5] or "--:--:--", 
+                    "area": row[6] or "General"
                 })
             conn.close()
         except Exception as e: 
@@ -180,7 +200,7 @@ def reports_search():
 @api_bp.route('/reports/export_dt', methods=['GET'])
 def export_dt():
     """
-    Reporte Legal Art. 27 - VERSIÓN FINAL
+    Reporte Legal Art. 27 - ADAPTADO
     """
     fecha_ini = request.args.get('start', datetime.now().strftime('%Y-%m-01'))
     fecha_fin = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
@@ -190,6 +210,7 @@ def export_dt():
         if not conn: return
         cursor = conn.cursor()
         
+        # SOLUCIÓN: Quitamos las columnas muertas y las sumas raras
         sql = """
             SELECT 
                 C.ID_TRABAJADOR,
@@ -197,9 +218,8 @@ def export_dt():
                 C.FECHA_DIA,
                 NVL(T.TURNO_INICIO_DESDE, '') AS RAW_INICIO,
                 NVL(T.TURNO_FINAL_HASTA, '') AS RAW_TERMINO,
-                C.ENTRADA_AM, C.SALIDA_AM, C.ENTRADA_PM, C.SALIDA_PM,
-                C.DIFF_ENT_AM, C.DIFF_SAL_AM, C.DIFF_ENT_PM, C.DIFF_SAL_PM,
-                C.ESTADO
+                C.HORA_MARCA,
+                C.AREA
             FROM ERPG_PASO_CAMARA C
             LEFT JOIN ERPG_VTURNOS_PROGRAMADOS T 
                 ON UPPER(REPLACE(REPLACE(C.ID_TRABAJADOR, '.', ''), '-', '')) 
@@ -207,7 +227,7 @@ def export_dt():
                 AND TRUNC(C.FECHA_DIA) BETWEEN TRUNC(T.FECHA_INICIO_TURNO) AND TRUNC(T.FECHA_TERMINO_TURNO)
                 AND T.ISACTIVE = 'Y'
             WHERE TRUNC(C.FECHA_DIA) BETWEEN TO_DATE(:1, 'YYYY-MM-DD') AND TO_DATE(:2, 'YYYY-MM-DD')
-            ORDER BY C.NOMBRE_TRABAJADOR, C.FECHA_DIA ASC
+            ORDER BY C.NOMBRE_TRABAJADOR, C.FECHA_DIA ASC, C.HORA_MARCA ASC
         """
         
         try:
@@ -220,121 +240,27 @@ def export_dt():
             w.writerow(['RUT EMPRESA:', '76.XXX.XXX-X'])
             w.writerow([]) 
             
+            # Encabezados simplificados para el modelo transaccional
             headers = [
-                'RUT', 'Nombre', 'Fecha', 
-                'Jornada ordinaria pactada', 'Marcaciones jornada', 
-                'Colación', 'Marcaciones colación', 
-                'Tiempo faltante', 'Tiempo extra', 
-                'Otras marcaciones', 'Observaciones'
+                'RUT', 'Nombre', 'Fecha', 'Jornada pactada', 'Hora de Marca', 'Lugar/Área'
             ]
             w.writerow(headers)
             yield data.getvalue(); data.seek(0); data.truncate(0)
 
-            prev_rut = None
-            prev_semana = None
-            sem_faltante = 0
-            sem_extra = 0
-
-            def fmt_hora(val):
-                if not val: return None
-                v = str(val).strip().split(' ')[-1]
-                parts = v.split(':')
-                if len(parts) == 3: return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}:{parts[2].zfill(2)}"
-                if len(parts) == 2: return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}:00"
-                return "00:00:00"
-
-            def sec_to_str(seconds, force_sign=True):
-                signo = "+" if seconds >= 0 else "-"
-                sec_abs = abs(int(seconds))
-                m, s = divmod(sec_abs, 60)
-                h, m = divmod(m, 60)
-                if force_sign: return f"{signo}{h:02}:{m:02}:{s:02}"
-                return f"{h:02}:{m:02}:{s:02}"
-
-            def extraer_minutos(texto_bd):
-                if not texto_bd: return 0
-                match = re.search(r'(\d+)', str(texto_bd))
-                return int(match.group(1)) if match else 0
-
             rows = cursor.fetchall()
             
             for row in rows:
-                rut, nombre, fecha_dt, raw_ini, raw_fin, \
-                m_e_am, m_s_am, m_e_pm, m_s_pm, \
-                diff_e_am, diff_s_am, diff_e_pm, diff_s_pm, estado_db = row
+                rut, nombre, fecha_dt, raw_ini, raw_fin, hora_marca, area = row
                 
-                curr_semana = fecha_dt.isocalendar()[1] 
+                fecha_str = fecha_dt.strftime('%d/%m/%Y') if fecha_dt else ""
                 
-                if (prev_rut and prev_rut != rut) or (prev_semana and prev_semana != curr_semana):
-                    w.writerow(['', '', 'TOTAL SEMANAL', '', '', '', '', 
-                                sec_to_str(sem_faltante), sec_to_str(sem_extra), '', ''])
-                    yield data.getvalue(); data.seek(0); data.truncate(0)
-                    sem_faltante = 0
-                    sem_extra = 0
-
-                fecha_str = fecha_dt.strftime('%d/%m/%Y')
-                
-                h_ini = fmt_hora(raw_ini) or "00:00:00"
-                h_fin = fmt_hora(raw_fin) or "00:00:00"
+                h_ini = raw_ini.split(' ')[-1] if raw_ini else "00:00:00"
+                h_fin = raw_fin.split(' ')[-1] if raw_fin else "00:00:00"
                 rango_pactado = f"{h_ini} - {h_fin}"
-                
-                hora_sal_am = fmt_hora(m_s_am)
-                hora_ent_pm = fmt_hora(m_e_pm)
-                obs_cruce = ""
-
-                if hora_sal_am and hora_ent_pm:
-                    if hora_sal_am > hora_ent_pm:
-                        hora_sal_am, hora_ent_pm = hora_ent_pm, hora_sal_am
-                        obs_cruce = " (Visual: Swap AM/PM)"
-
-                real_ent = fmt_hora(m_e_am) or "--:--:--"
-                real_sal = fmt_hora(m_s_pm) or "--:--:--"
-                rango_real = f"{real_ent} - {real_sal}" if (m_e_am or m_s_pm) else "AUSENCIA"
-                
-                rango_colacion_real = ""
-                if hora_sal_am and hora_ent_pm:
-                    rango_colacion_real = f"{hora_sal_am} - {hora_ent_pm}"
-
-                min_faltante = 0
-                min_extra = 0
-                
-                for texto in [diff_e_am, diff_s_am, diff_e_pm, diff_s_pm]:
-                    if not texto: continue
-                    txt = str(texto).upper()
-                    valor = extraer_minutos(txt)
-                    
-                    if "ATRASO" in txt or "ANTICIPADA" in txt:
-                        min_faltante += valor
-                    elif "EXTRA" in txt:
-                        min_extra += valor 
-                    
-                str_faltante = sec_to_str(min_faltante * -60) 
-                str_extra = sec_to_str(min_extra * 60) 
-                
-                sem_faltante += (min_faltante * -60)
-                sem_extra += (min_extra * 60)
-
-                obs = obs_cruce
-                if h_ini == "00:00:00" and h_fin == "23:59:00": obs += " ERROR DATOS TURNOS"
-                if estado_db and "INCIDENCIA" in estado_db: obs += " " + estado_db
 
                 w.writerow([
-                    rut, nombre, fecha_str, 
-                    rango_pactado, 
-                    rango_real, 
-                    "13:00:00 - 14:00:00", 
-                    rango_colacion_real, 
-                    str_faltante, 
-                    str_extra, 
-                    "", obs.strip()
+                    rut, nombre, fecha_str, rango_pactado, hora_marca, area
                 ])
-                yield data.getvalue(); data.seek(0); data.truncate(0)
-
-                prev_rut = rut
-                prev_semana = curr_semana
-
-            if prev_rut:
-                w.writerow(['', '', 'TOTAL SEMANAL', '', '', '', '', sec_to_str(sem_faltante), sec_to_str(sem_extra), '', ''])
                 yield data.getvalue(); data.seek(0); data.truncate(0)
 
         except Exception as e:
@@ -403,7 +329,6 @@ def rectify_attendance():
     try:
         data = request.json
         
-        # Extraer datos del formulario HTML
         id_original = data.get('id_original')
         rut = data.get('rut')
         nuevas_horas = data.get('nuevas_horas') 
@@ -413,7 +338,6 @@ def rectify_attendance():
         if not id_original or not admin or not motivo:
              return jsonify({'status': 'error', 'msg': 'Faltan datos obligatorios (ID, Admin o Motivo)'}), 400
 
-        # Llamar al módulo de rectificación
         resultado = rectificacion.rectificar_asistencia(id_original, rut, nuevas_horas, admin, motivo)
         
         return jsonify(resultado)
@@ -433,22 +357,15 @@ def reports_summary():
         try:
             cur = conn.cursor()
             
+            # SOLUCIÓN: Eliminado cálculo de DIFF_ENT_AM que ya no existe
             sql = r"""
                 SELECT 
                     ID_TRABAJADOR,
                     NOMBRE_TRABAJADOR,
                     TO_CHAR(FECHA_DIA, 'YYYY-MM') AS MES,
-                    COUNT(*) AS DIAS_TRABAJADOS,
-                    SUM(CASE 
-                        WHEN DIFF_ENT_AM LIKE '%ATRASO%' 
-                        THEN TO_NUMBER(REGEXP_SUBSTR(DIFF_ENT_AM, '\d+')) 
-                        ELSE 0 
-                    END) AS TOTAL_ATRASO,
-                    SUM(CASE 
-                        WHEN DIFF_SAL_PM LIKE '%EXTRA%' 
-                        THEN TO_NUMBER(REGEXP_SUBSTR(DIFF_SAL_PM, '\d+')) 
-                        ELSE 0 
-                    END) AS TOTAL_EXTRA
+                    COUNT(DISTINCT FECHA_DIA) AS DIAS_TRABAJADOS,
+                    0 AS TOTAL_ATRASO,
+                    0 AS TOTAL_EXTRA
                 FROM ERPG_PASO_CAMARA
             """
             
@@ -475,7 +392,7 @@ def reports_summary():
     return jsonify(resultados)
 
 
-# --- AUDITORÍA DE SEGURIDAD (ACTUALIZADA A FILA COMPLETA) ---
+# --- AUDITORÍA DE SEGURIDAD ---
 @api_bp.route('/security/audit', methods=['GET'])
 def security_audit():
     conn = obtener_conexion_oracle()
@@ -488,12 +405,12 @@ def security_audit():
     try:
         cursor = conn.cursor()
         
+        # SOLUCIÓN: Buscar columnas nuevas
         sql = """
             SELECT * FROM (
                 SELECT 
                     ID_SECUENCIA, ID_TRABAJADOR, NOMBRE_TRABAJADOR, TO_CHAR(FECHA_DIA, 'YYYY-MM-DD'), 
-                    ENTRADA_AM, SALIDA_AM, ENTRADA_PM, SALIDA_PM, 
-                    ESTADO, AREA, HASH_SHA256
+                    HORA_MARCA, AREA, HASH_SHA256
                 FROM ERPG_PASO_CAMARA 
                 WHERE HASH_SHA256 IS NOT NULL 
                 ORDER BY ID_SECUENCIA DESC 
@@ -509,15 +426,12 @@ def security_audit():
             rut = fila[1]
             nombre = fila[2]
             fecha = fila[3]
-            e_am = fila[4]
-            s_am = fila[5]
-            e_pm = fila[6]
-            s_pm = fila[7]
-            estado = fila[8]
-            area = fila[9]
-            hash_guardado = fila[10]
+            hora_marca = fila[4]
+            area = fila[5]
+            hash_guardado = fila[6]
 
-            hash_calculado = generar_hash_fila(rut, nombre, fecha, e_am, s_am, e_pm, s_pm, estado, area)
+            # Rellenamos el generador de hash con los mismos dummy que usamos al insertar
+            hash_calculado = generar_hash_fila(rut, nombre, fecha, hora_marca, "LOG", "-", "-", "OK", area)
             
             if str(hash_guardado).strip() != str(hash_calculado).strip():
                 total_corruptos += 1

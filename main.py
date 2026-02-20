@@ -1,6 +1,8 @@
 import threading
 import time
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, render_template, jsonify, request, send_file
+import io
+from werkzeug.utils import secure_filename
 
 # Importamos nuestros módulos (Ya blindados y listos)
 from configuracion.base_datos import inicializar_db_offline, obtener_conexion_oracle
@@ -18,6 +20,55 @@ app.secret_key = 'clave_seguridad_dt_2026'
 
 app.register_blueprint(web_bp)
 app.register_blueprint(api_bp, url_prefix='/api')
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'jfif'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/subir_foto/<rut_trabajador>', methods=['POST'])
+def api_subir_foto(rut_trabajador):
+    """ Recibe una foto del frontend y la distribuye a las cámaras """
+    try:
+        # 1. Validaciones básicas
+        if 'archivo_foto' not in request.files:
+            return jsonify({'ok': False, 'error': 'No se envió ningún archivo de imagen.'}), 400
+        
+        file = request.files['archivo_foto']
+        
+        if file.filename == '':
+            return jsonify({'ok': False, 'error': 'Nombre de archivo vacío.'}), 400
+            
+        if not allowed_file(file.filename):
+            return jsonify({'ok': False, 'error': 'Formato no permitido. Use JPG o PNG.'}), 400
+
+        # 2. Leer la imagen a memoria (bytes)
+        imagen_bytes = file.read()
+        filename_seguro = secure_filename(file.filename)
+
+        print(f"📸 [Upload] Iniciando subida de foto para RUT {rut_trabajador} ({len(imagen_bytes)/1024:.2f} KB)")
+
+        # 3. Usar el Sincronizador existente para distribuirla
+        # Usamos una función nueva que crearemos en el paso 3
+        resultados = sincronizador.distribuir_foto_a_camaras(rut_trabajador, imagen_bytes, filename_seguro)
+        
+        # Analizar resultados
+        exitos = sum(1 for r in resultados if r['ok'])
+        errores = [r['ip'] + ": " + r['error'] for r in resultados if not r['ok']]
+        
+        if exitos == 0 and errores:
+             return jsonify({'ok': False, 'error': f"Fallo total. Detalles: {'; '.join(errores)}"}), 500
+             
+        mensaje_final = f"Foto subida a {exitos} de {len(resultados)} cámaras."
+        if errores:
+            mensaje_final += f" Fallos en: {', '.join(errores)}"
+
+        return jsonify({'ok': True, 'mensaje': mensaje_final})
+
+    except Exception as e:
+        print(f"❌ Error crítico subiendo foto: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 # Ruta para servir fotos (necesaria para verlas en la web si no están encriptadas)
 @app.route('/statics/fotos/<path:filename>')
